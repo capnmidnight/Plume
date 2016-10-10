@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1">
+    <meta name="web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="purple">
+    <meta name="apple-mobile-web-app-status-bar-style" content="purple">
+    <meta name="keywords" content="WebGL, WebVR, HTML5, JavaScript, virtual reality, Primrose, teleconferencing, WebRTC, calls">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@NotionTheory">
+    <meta property="og:url" content="https://www.plumevr.com">
+    <meta property="og:site_name" content="Plume VR">
+    <meta property="og:title" content="Plume VR">
+    <meta name="twitter:title" content="Plume VR">
+    <meta name="description" content="Instant VR meetings in your browser.">
+    <meta property="og:description" content="Instant VR meetings in your browser.">
+    <meta name="twitter:description" content="Instant VR meetings in your browser.">
+    <title>Plume VR: Instant VR meetings in your browser.</title>
+    <link type="text/css" rel="stylesheet" href="style.css">
+    <style>#frontBuffer { background-image:url(screenshot.jpg); }</style>
+    <script src="node_modules/pliny/pliny.js"></script>
+    <script src="node_modules/jshashes/hashes.js"></script>
+    <script src="../Primrose/PrimroseDependencies.js"></script>
+    <script src="../Primrose/PrimroseLib-WithDoc.js"></script>
+  </head>
+  <body>
+    <h1>Meeting Room</h1>
+    <div id="content">
+      <canvas id="frontBuffer"></canvas>
+      <progress id="prog"></progress>
+    </div>
+    <div id="controls"></div>
+    <div id="loginForm" style="display:none">
+      <button class="secondary" id="closeButton">&times;</button>
+      <h2>Create your personal VR meeting room</h2>
+      <div class="inputRow" id="roomNameRow">
+        <input id="roomName" type="text" placeholder="Pick a room name">
+        <button class="primary" id="randomRoomName">&#x21bb;</button>
+      </div><br>
+      <div class="inputRow" id="userNameRow">
+        <input id="userName" type="text" placeholder="Pick a username">
+        <button class="primary" id="randomUserName">&#x21bb;</button>
+        <button class="primary" id="connect">&rarr;</button>
+      </div>
+      <div id="errorMessage" style="display:none"></div>
+    </div>
+    <script src="plume.js"></script>
+  </body>
+</html>

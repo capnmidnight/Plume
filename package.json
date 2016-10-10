@@ -1,0 +1,43 @@
+{
+  "name": "plume",
+  "private": true,
+  "version": "0.0.1",
+  "title": "Plume VR",
+  "description": "Instant VR meetings in your browser.",
+  "themeColor": "purple",
+  "homepage": "https://www.plumevr.com",
+  "twitter": "@NotionTheory",
+  "keywords": [
+    "WebGL",
+    "WebVR",
+    "HTML5",
+    "JavaScript",
+    "virtual reality",
+    "Primrose",
+    "teleconferencing",
+    "WebRTC",
+    "calls"
+  ],
+  "GoogleWebVROriginTrialToken": "<check back later>",
+  "main": "server.js",
+  "scripts": {
+    "start":"node server.js",
+    "test":"node server.js --mode=dev --path=.. --url=Plume/index.html?room=test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NotionTheory/Plume.git"
+  },
+  "author": "Sean T. McBeth <sean@notiontheory.com> (https://www.notiontheory.com)",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "azure-storage":"^0.10.0",
+    "iphone-inline-video": "^1.9.3",
+    "mime":"^1.3.4",
+    "primrose":"^0.27.0",
+    "socket.io":"^1.4.4"
+  },
+  "devDependencies": {
+    "notiontheory-basic-build": "^2.3.14"
+  }
+}
