@@ -7,6 +7,7 @@ const options = require("./options").parse(process.argv),
   mime = require("mime"),
   path = require("path"),
   stream = require("stream"),
+  url = require("url"),
   headerTranslation = {
     length: "content-length",
     mime: "content-type"
@@ -171,7 +172,9 @@ class Message {
           resolve(Message.NotFound);
         }
         else if (stat.isDirectory()) {
-          resolve(Message.redirect(state.url + "/"));
+          var parts = url.parse(state.url);
+          parts.pathname += "/";
+          resolve(Message.redirect(url.format(parts)));
         }
         else {
           if (isDev) {
@@ -201,15 +204,15 @@ class Message {
     });
   }
 
-  static redirect(url) {
+  static redirect(targetURL) {
     return new Message(307, null, {
-      "location": url
+      "location": targetURL
     });
   }
 
-  static movedPermanently(url){
+  static movedPermanently(targetURL){
     return new Message(301, null, {
-      "location": url
+      "location": targetURL
     });
   }
 }
@@ -219,7 +222,7 @@ Message.BadRequest = new Message(400);
 Message.Unauthorized = new Message(401);
 Message.PaymentRequired = new Message(402);
 Message.Forbidden = new Message(403);
-Message.NotFound = new Message(404);
+Message.NotFound = new Message(404, "File not found");
 Message.MethodNotAllowed = new Message(405);
 Message.NotAcceptable = new Message(406);
 Message.ProxyAuthenticationRequired = new Message(407);
