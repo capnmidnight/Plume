@@ -1,4 +1,3 @@
-"use strict";
 WebVRStandardMonitor();
 var ctrls = Primrose.DOM.findEverything(),
   loginControls = [
