@@ -12,6 +12,7 @@ var ctrls = Primrose.DOM.findEverything(),
   defaultRoomName = null,
   defaultUserName = null,
   socket = null,
+  session = null,
 
   app = new Primrose.BrowserEnvironment({
     useFog: false,
@@ -24,7 +25,7 @@ var ctrls = Primrose.DOM.findEverything(),
     sceneModel: "models/meeting/meetingroom.obj",
     avatarModel: "models/avatar.json",
     font: "fonts/helvetiker_regular.typeface.json",
-    webRTC: "/turn"
+    disableWebRTC: true
   });
 
 ctrls.closeButton.addEventListener("click", hideLoginForm, false);
@@ -178,4 +179,26 @@ function authSucceeded() {
   document.cookie = "user=" + userName + "&room=" + roomName;
   app.connect(socket, userName);
   document.title = userName + " in " + roomName;
+
+  Primrose.HTTP.getObject("/tokbox/?room=" + roomName + "&user=" + userName).then((cred) => {
+    console.log("tokbox", cred);
+    session = OT.initSession(cred.apiKey, cred.sessionId)
+      .on('streamCreated', (evt) => {
+        const userSpec = evt.stream.connection.data.match(userPattern);
+        console.log("tokbox streamCreated", evt, userSpec && userSpec[1]);
+        session.subscribe(evt.stream);
+      })
+      .connect(cred.token, (error) => {
+        if(error) {
+          console.error("tokbox error", error);
+        }
+        else {
+          var publisher = OT.initPublisher();
+          publisher.publishVideo(false);
+          console.log("tokbox publisher", publisher);
+          session.publish(publisher);
+        }
+      });
+    console.log("tokbox session", session);
+  });
 }

@@ -1,31 +1,34 @@
 ////////////////////////////////////////////////////////////////////////////////
-    // start D:\Documents\VR\Plume\src\app.js
-(function(){"use strict";
-
-WebVRStandardMonitor();
+    // start C:\Users\sean\Documents\VR\Plume\src\app.js
+(function(){WebVRStandardMonitor();
 var ctrls = Primrose.DOM.findEverything(),
-    loginControls = [ctrls.userName, ctrls.connect],
-    names = NameGen.compile("!mi"),
-    protocol = location.protocol.replace("http", "ws"),
-    serverPath = protocol + "//" + location.hostname,
-    roomPattern = /\broom=(\w+)/,
-    userPattern = /\buser=(\w+)/,
-    defaultRoomName = null,
-    defaultUserName = null,
-    socket = null,
-    app = new Primrose.BrowserEnvironment({
-  useFog: false,
-  autoScaleQuality: true,
-  autoRescaleQuality: false,
-  quality: Quality.HIGH,
-  groundTexture: 0x000000,
-  backgroundColor: 0x000000,
-  disableDefaultLighting: true,
-  sceneModel: "models/meeting/meetingroom.obj",
-  avatarModel: "models/avatar.json",
-  font: "fonts/helvetiker_regular.typeface.json",
-  webRTC: "/turn"
-});
+  loginControls = [
+    ctrls.userName,
+    ctrls.connect
+  ],
+  names = NameGen.compile("!mi"),
+  protocol = location.protocol.replace("http", "ws"),
+  serverPath = protocol + "//" + location.hostname,
+  roomPattern = /\broom=(\w+)/,
+  userPattern = /\buser=(\w+)/,
+  defaultRoomName = null,
+  defaultUserName = null,
+  socket = null,
+  session = null,
+
+  app = new Primrose.BrowserEnvironment({
+    useFog: false,
+    autoScaleQuality: true,
+    autoRescaleQuality: false,
+    quality: Quality.HIGH,
+    groundTexture: 0x000000,
+    backgroundColor: 0x000000,
+    disableDefaultLighting: true,
+    sceneModel: "models/meeting/meetingroom.obj",
+    avatarModel: "models/avatar.json",
+    font: "fonts/helvetiker_regular.typeface.json",
+    disableWebRTC: true
+  });
 
 ctrls.closeButton.addEventListener("click", hideLoginForm, false);
 ctrls.userName.addEventListener("keyup", authenticate, false);
@@ -39,37 +42,41 @@ window.addEventListener("popstate", setRoomName);
 app.addEventListener("ready", environmentReady);
 
 setRoomName({ state: {
-    roomName: fromField(location.search, roomPattern) || fromField(document.cookie, roomPattern)
-  } });
+  roomName: fromField(location.search, roomPattern) || fromField(document.cookie, roomPattern)
+}});
 
 setUserName({ state: {
-    userName: fromField(location.search, userPattern) || fromField(document.cookie, userPattern)
-  } });
+  userName: fromField(location.search, userPattern) || fromField(document.cookie, userPattern)
+}});
 
 function setRoomName(evt) {
   defaultRoomName = evt && evt.state && evt.state.roomName;
-  if (defaultRoomName) {
+  if(defaultRoomName){
     evt = evt || true;
     ctrls.roomName.value = defaultRoomName;
-  } else if (evt.type === "change") {
+  }
+  else if(evt.type === "change"){
     defaultRoomName = ctrls.roomName.value;
-  } else {
+  }
+  else {
     defaultRoomName = names.toString();
     ctrls.roomName.placeholder = "Type a room name (currently " + defaultRoomName + ")";
     ctrls.roomName.value = "";
   }
-  if (evt && evt.type !== "popstate") {
+  if(evt && evt.type !== "popstate"){
     history.pushState({ roomName: defaultRoomName }, "Room ID: " + defaultRoomName, "?room=" + defaultRoomName);
   }
 }
 
 function setUserName(evt) {
   defaultUserName = evt && evt.state && evt.state.userName;
-  if (defaultUserName) {
+  if(defaultUserName){
     ctrls.userName.value = defaultUserName;
-  } else if (evt.type === "change") {
+  }
+  else if(evt.type === "change"){
     defaultUserName = ctrls.userName.value;
-  } else {
+  }
+  else{
     defaultUserName = names.toString();
     ctrls.userName.placeholder = "Type a user name (currently " + defaultUserName + ")";
     ctrls.userName.value = "";
@@ -90,8 +97,8 @@ function fromField(field, pattern) {
 }
 
 function hideLoginForm(evt) {
-  ctrls.loginForm.style.display = "none";
-  ctrls.frontBuffer.focus();
+ ctrls.loginForm.style.display = "none";
+ ctrls.frontBuffer.focus();
 }
 
 function showLoginForm() {
@@ -107,9 +114,7 @@ function errorMessage(message) {
 }
 
 function disableLogin(v) {
-  loginControls.forEach(function (ctrl) {
-    return ctrl.disabled = v;
-  });
+  loginControls.forEach(function (ctrl) { return ctrl.disabled = v; });
   document.body.style.cursor = v ? "wait" : "";
 }
 
@@ -172,13 +177,35 @@ function authSucceeded() {
   disableLogin(false);
   hideLoginForm();
   var userName = getUserName(),
-      roomName = getRoomName();
+    roomName = getRoomName();
   document.cookie = "user=" + userName + "&room=" + roomName;
   app.connect(socket, userName);
   document.title = userName + " in " + roomName;
+
+  Primrose.HTTP.getObject("/tokbox/?room=" + roomName + "&user=" + userName).then(function (cred) {
+    console.log("tokbox", cred);
+    session = OT.initSession(cred.apiKey, cred.sessionId)
+      .on('streamCreated', function (evt) {
+        var userSpec = evt.stream.connection.data.match(userPattern);
+        console.log("tokbox streamCreated", evt, userSpec && userSpec[1]);
+        session.subscribe(evt.stream);
+      })
+      .connect(cred.token, function (error) {
+        if(error) {
+          console.error("tokbox error", error);
+        }
+        else {
+          var publisher = OT.initPublisher();
+          publisher.publishVideo(false);
+          console.log("tokbox publisher", publisher);
+          session.publish(publisher);
+        }
+      });
+    console.log("tokbox session", session);
+  });
 }
     if(typeof window !== "undefined") window.app = app;
 })();
-    // end D:\Documents\VR\Plume\src\app.js
+    // end C:\Users\sean\Documents\VR\Plume\src\app.js
     ////////////////////////////////////////////////////////////////////////////////
 console.info("plume v0.0.1. see https://www.plumevr.com for more information.");

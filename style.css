@@ -140,3 +140,6 @@ button:disabled {
     bottom: initial;
   }
 }
+.OT_root {
+  display: none;
+}

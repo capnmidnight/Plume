@@ -1,3 +1,7 @@
+"use strict";
+
+//http://xirsys.com/guide/#
+
 const secure = 1,
   root = "https://service.xirsys.com/",
   domain = "www.primrosevr.com",
@@ -30,7 +34,7 @@ function req(thunk, path, params){
   }
 }
 
-module.exports = {
+const xirsys = {
   signal: {
     token: (application, room) => req(get, "signal/token", {
       domain: domain,
@@ -83,5 +87,12 @@ module.exports = {
       application: application,
       room: room
     })
+  }
+};
+
+module.exports = {
+  URLPattern: /^\/xirsys\/?$/,
+  GET: {
+    "*/*": (state) => xirsys.ice().then(Message.json)
   }
 };
