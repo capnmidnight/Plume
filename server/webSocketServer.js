@@ -1,7 +1,6 @@
 "use strict";
 
 const User = require("./data/User"),
-  userDB = require("./data/users"),
   activeUsers = {},
   options = require("./options").parse(process.argv),
   isDev = options.mode === "dev" || process.env.NODE_ENV === "dev";
@@ -84,28 +83,6 @@ function setUser(socket, identity, key, user){
   activeUsers[key].addDevice(socket, identity.appKey);
 }
 
-function receiveHash(socket, verb, identity, key, user, hash) {
-  Promise.resolve().then(() => {
-    if (user.userName === identity.userName && (verb === "login" && user.hash === hash || verb === "signup" && user.hash === null && hash)) {
-      setUser(socket, identity, key, user);
-      user.hash = hash;
-      user.lastLogin = new Date();
-      return userDB.set(user);
-    }
-    else if(verb === "login") {
-      throw new Error("User name and password do not match.");
-    }
-    else {
-      throw new Error("No password was received at the server.");
-    }
-  }).catch((exp) => {
-    socket.emit(verb + "Failed", exp.message);
-    var msg = exp.message || exp;
-    console.error(msg);
-    socket.emit("errorDetail", msg);
-  });
-}
-
 function setup(socket, verb, thunk){
   return (identity) => {
     const key = User.makeID(identity);
@@ -129,31 +106,6 @@ function setup(socket, verb, thunk){
   }
 }
 
-function userAuth(socket, verb) {
-  return setup(socket, verb, (identity, key) => {
-    userDB.search(identity.userName).then((users) => {
-      if (verb === "login" && users.length === 0){
-        socket.emit("loginFailed", "the user '[USER]' does not exist.");
-      }
-      else if (verb === "signup" && users.length > 0){
-        socket.emit("signupFailed", "the user name '[USER]' already exists.");
-      }
-      else {
-        var user = users[0] || {
-          userName: identity.userName,
-          salt: userDB.newSalt(),
-          hash: null,
-          email: identity.email,
-          lastLogin: null,
-          appKey: null
-        };
-        socket.once("hash", receiveHash.bind(null, socket, verb, identity, key, user));
-        socket.emit("salt", user.salt);
-      }
-    });
-  });
-}
-
 function guestLogin(socket) {
   return setup(socket, "login", (identity, key) => {
     setUser(socket, identity, key);
@@ -163,8 +115,6 @@ function guestLogin(socket) {
 module.exports = function (socket) {
   console.log("New connection!");
 
-  socket.on("login", userAuth(socket, "login"));
-  socket.on("signup", userAuth(socket, "signup"));
   socket.on("guest", guestLogin(socket));
   socket.on("error", socket.emit.bind(socket, "errorDetail"));
 };

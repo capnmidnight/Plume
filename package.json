@@ -22,7 +22,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node server.js --mode=dev --path=.. --url=Plume/?room=test"
+    "test": "node server.js --mode=dev --path=.. --url=Plume/index.html"
   },
   "repository": {
     "type": "git",
