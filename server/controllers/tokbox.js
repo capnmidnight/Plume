@@ -11,23 +11,32 @@ function getSessionID() {
       if (error) {
         reject(error);
       } else {
-        resolve(session.sessionId);
+        resolve(session);
       }
     });
   });
 }
 
-const defaultSessionPromise = getSessionID();
+const sessions = {};
 
 module.exports = {
-  URLPattern: /^\/tokbox\/?$/,
+  URLPattern: /^\/tokbox\/?\?room=(\w+)&user=(\w+)$/,
   GET: {
-    "*/*": (state) => defaultSessionPromise.then((session) => {
-      return {
-        apiKey: API_KEY,
-        sessionID: session.sessionID,
-        token: session.generateToken()
-      };
-    }).then(Message.json)
+    "*/*": (room, user, state) => {
+      room = room.toLocaleUpperCase();
+      user = user.toLocaleUpperCase();
+      if(!sessions[room]){
+        sessions[room] = getSessionID();
+      }
+      return sessions[room].then((session) => {
+        return {
+          apiKey: API_KEY,
+          sessionId: session.sessionId,
+          token: session.generateToken({
+            data: user
+          })
+        };
+      }).then(Message.json);
+    }
   }
 };
