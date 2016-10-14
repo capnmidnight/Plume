@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-    // start C:\Users\sean\Documents\VR\Plume\src\app.js
+  // start C:\Users\sean\Documents\VR\Plume\src\app.js
 (function(){WebVRStandardMonitor();
 var ctrls = Primrose.DOM.findEverything(),
   loginControls = [
@@ -60,7 +60,7 @@ function setRoomName(evt) {
   }
   else {
     defaultRoomName = names.toString();
-    ctrls.roomName.placeholder = "Type a room name (currently " + defaultRoomName + ")";
+    ctrls.roomName.placeholder = "Room (" + defaultRoomName + ")";
     ctrls.roomName.value = "";
   }
   if(evt && evt.type !== "popstate"){
@@ -78,7 +78,7 @@ function setUserName(evt) {
   }
   else{
     defaultUserName = names.toString();
-    ctrls.userName.placeholder = "Type a user name (currently " + defaultUserName + ")";
+    ctrls.userName.placeholder = "User (" + defaultUserName + ")";
     ctrls.userName.value = "";
   }
 }
@@ -114,24 +114,40 @@ function errorMessage(message) {
 }
 
 function disableLogin(v) {
-  loginControls.forEach(function (ctrl) { return ctrl.disabled = v; });
+  loginControls.forEach((ctrl) => ctrl.disabled = v);
   document.body.style.cursor = v ? "wait" : "";
 }
 
 function environmentReady() {
   ctrls.loginForm.style.display = "";
-  ctrls.prog.style.display = "none";
-  WebVRStandardMonitor();
-  app.input.VR.displays.forEach(function (display, i) {
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "secondary";
-    btn.appendChild(document.createTextNode(display.displayName));
-    btn.addEventListener("click", app.goFullScreen.bind(app, i, "Button"));
-    ctrls.controls.appendChild(btn);
+
+  window.addEventListener("vrdisplaypresentchange", () => {
+    const currDev = app.input.VR.currentDevice;
+    ctrls.controls.style.display = currDev && currDev.isPresenting ? "none" : "";
   });
 
-  app.scene.traverse(function (obj) {
+  app.displays.forEach(function(display, i){
+    var btn = document.createElement( "button" ),
+      isStereo = Primrose.Input.VR.isStereoDisplay(display),
+      enterVR = app.goFullScreen.bind(app, i);
+    btn.type = "button";
+    btn.className = "primary";
+    btn.innerHTML = display.displayName;
+    btn.addEventListener( "click", enterVR);
+    window.addEventListener("vrdisplayactivate", function(display, enterVR, evt){
+      if(evt.display === display) {
+        var exitVR = function(){
+          window.removeEventListener("vrdisplaydeactivate", exitVR);
+          app.input.VR.cancel();
+        };
+        window.addEventListener("vrdisplaydeactivate", exitVR, false);
+        enterVR();
+      }
+    }.bind(window, display, enterVR), false);
+    ctrls.fullScreenButtonContainer.appendChild(btn);
+  });
+
+  app.scene.traverse((obj) => {
     if (obj.name.indexOf("LightPanel") === 0) {
       obj.material.emissive.setRGB(1, 1, 1);
     }
@@ -176,21 +192,21 @@ function authSucceeded() {
   ctrls.errorMessage.style.display = "none";
   disableLogin(false);
   hideLoginForm();
-  var userName = getUserName(),
+  const userName = getUserName(),
     roomName = getRoomName();
   document.cookie = "user=" + userName + "&room=" + roomName;
   app.connect(socket, userName);
   document.title = userName + " in " + roomName;
 
-  Primrose.HTTP.getObject("/tokbox/?room=" + roomName + "&user=" + userName).then(function (cred) {
+  Primrose.HTTP.getObject("/tokbox/?room=" + roomName + "&user=" + userName).then((cred) => {
     console.log("tokbox", cred);
     session = OT.initSession(cred.apiKey, cred.sessionId)
-      .on('streamCreated', function (evt) {
-        var userSpec = evt.stream.connection.data.match(userPattern);
+      .on('streamCreated', (evt) => {
+        const userSpec = evt.stream.connection.data.match(userPattern);
         console.log("tokbox streamCreated", evt, userSpec && userSpec[1]);
         session.subscribe(evt.stream);
       })
-      .connect(cred.token, function (error) {
+      .connect(cred.token, (error) => {
         if(error) {
           console.error("tokbox error", error);
         }
@@ -204,8 +220,7 @@ function authSucceeded() {
     console.log("tokbox session", session);
   });
 }
-    if(typeof window !== "undefined") window.app = app;
+  if(typeof window !== "undefined") window.app = app;
 })();
-    // end C:\Users\sean\Documents\VR\Plume\src\app.js
-    ////////////////////////////////////////////////////////////////////////////////
-console.info("plume v0.0.1. see https://www.plumevr.com for more information.");
+  // end C:\Users\sean\Documents\VR\Plume\src\app.js
+  ////////////////////////////////////////////////////////////////////////////////

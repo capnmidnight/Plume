@@ -22,7 +22,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node server.js --mode=dev --path=.. --url=Plume/index.html"
+    "test": "node server.js --mode=dev --path=.. --url=Plume/"
   },
   "repository": {
     "type": "git",
@@ -35,7 +35,7 @@
     "iphone-inline-video": "^1.9.3",
     "mime": "^1.3.4",
     "opentok": "^2.4.0",
-    "primrose": "^0.27.0",
+    "primrose": "^0.28.0",
     "socket.io": "^1.4.4"
   },
   "devDependencies": {

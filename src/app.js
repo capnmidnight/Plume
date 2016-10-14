@@ -58,7 +58,7 @@ function setRoomName(evt) {
   }
   else {
     defaultRoomName = names.toString();
-    ctrls.roomName.placeholder = "Type a room name (currently " + defaultRoomName + ")";
+    ctrls.roomName.placeholder = "Room (" + defaultRoomName + ")";
     ctrls.roomName.value = "";
   }
   if(evt && evt.type !== "popstate"){
@@ -76,7 +76,7 @@ function setUserName(evt) {
   }
   else{
     defaultUserName = names.toString();
-    ctrls.userName.placeholder = "Type a user name (currently " + defaultUserName + ")";
+    ctrls.userName.placeholder = "User (" + defaultUserName + ")";
     ctrls.userName.value = "";
   }
 }
@@ -118,15 +118,31 @@ function disableLogin(v) {
 
 function environmentReady() {
   ctrls.loginForm.style.display = "";
-  ctrls.prog.style.display = "none";
-  WebVRStandardMonitor();
-  app.input.VR.displays.forEach((display, i) => {
-    const btn = document.createElement("button");
+
+  window.addEventListener("vrdisplaypresentchange", () => {
+    const currDev = app.input.VR.currentDevice;
+    ctrls.controls.style.display = currDev && currDev.isPresenting ? "none" : "";
+  });
+
+  app.displays.forEach(function(display, i){
+    var btn = document.createElement( "button" ),
+      isStereo = Primrose.Input.VR.isStereoDisplay(display),
+      enterVR = app.goFullScreen.bind(app, i);
     btn.type = "button";
-    btn.className = "secondary";
-    btn.appendChild(document.createTextNode(display.displayName));
-    btn.addEventListener("click", app.goFullScreen.bind(app, i, "Button"));
-    ctrls.controls.appendChild(btn);
+    btn.className = "primary";
+    btn.innerHTML = display.displayName;
+    btn.addEventListener( "click", enterVR);
+    window.addEventListener("vrdisplayactivate", function(display, enterVR, evt){
+      if(evt.display === display) {
+        var exitVR = function(){
+          window.removeEventListener("vrdisplaydeactivate", exitVR);
+          app.input.VR.cancel();
+        };
+        window.addEventListener("vrdisplaydeactivate", exitVR, false);
+        enterVR();
+      }
+    }.bind(window, display, enterVR), false);
+    ctrls.fullScreenButtonContainer.appendChild(btn);
   });
 
   app.scene.traverse((obj) => {

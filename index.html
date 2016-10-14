@@ -29,24 +29,24 @@
   </head>
   <body>
     <h1>Meeting Room</h1>
-    <div id="content">
-      <canvas id="frontBuffer"></canvas>
-      <progress id="prog"></progress>
-    </div>
-    <div id="controls"></div>
-    <div id="loginForm" style="display:none">
-      <button class="secondary" id="closeButton">&times;</button>
-      <h2>Create your personal VR meeting room</h2>
-      <div class="inputRow" id="roomNameRow">
-        <input id="roomName" type="text" placeholder="Pick a room name">
-        <button class="primary" id="randomRoomName">&#x21bb;</button>
-      </div><br>
-      <div class="inputRow" id="userNameRow">
-        <input id="userName" type="text" placeholder="Pick a username">
-        <button class="primary" id="randomUserName">&#x21bb;</button>
-        <button class="primary" id="connect">&rarr;</button>
+    <canvas id="frontBuffer"></canvas>
+    <div id="controls">
+      <div id="fullScreenButtonContainer"></div>
+      <div id="tokbox"></div>
+      <div id="loginForm" style="display:none">
+        <button class="secondary" id="closeButton" type="button">&times;</button>
+        <h2>Create your personal VR meeting room</h2>
+        <div class="inputRow" id="roomNameRow">
+          <input id="roomName" type="text" placeholder="Pick a room name">
+          <button class="primary" id="randomRoomName" type="button">&#x21bb;</button>
+        </div><br>
+        <div class="inputRow" id="userNameRow">
+          <input id="userName" type="text" placeholder="Pick a username">
+          <button class="primary" id="randomUserName" type="button">&#x21bb;</button>
+          <button class="primary" id="connect" type="button">&rarr;</button>
+        </div>
+        <div id="errorMessage" style="display:none"></div>
       </div>
-      <div id="errorMessage" style="display:none"></div>
     </div>
     <script src="plume.js"></script>
   </body>
