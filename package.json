@@ -1,7 +1,7 @@
 {
   "name": "plume",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "title": "Plume VR",
   "description": "Instant VR meetings in your browser.",
   "themeColor": "purple",
