@@ -14,11 +14,12 @@ var ctrls = Primrose.DOM.findEverything(),
     defaultUserName = null,
     socket = null,
     session = null,
+    publisher = null,
     app = new Primrose.BrowserEnvironment({
   useFog: false,
   autoScaleQuality: true,
   autoRescaleQuality: false,
-  quality: Quality.HIGH,
+  quality: Quality.LOW,
   groundTexture: 0x000000,
   backgroundColor: 0x000000,
   disableDefaultLighting: true,
@@ -190,27 +191,48 @@ function authSucceeded() {
   hideLoginForm();
   var userName = getUserName(),
       roomName = getRoomName();
-  document.cookie = "user=" + userName + "&room=" + roomName;
+  document.cookie = "room=" + encodeURI(roomName) + "&user=" + encodeURI(userName);
   app.connect(socket, userName);
   document.title = userName + " in " + roomName;
 
-  Primrose.HTTP.getObject("/tokbox/?room=" + roomName + "&user=" + userName).then(function (cred) {
-    console.log("tokbox", cred);
-    session = OT.initSession(cred.apiKey, cred.sessionId).on('streamCreated', function (evt) {
-      var userSpec = evt.stream.connection.data.match(userPattern);
-      console.log("tokbox streamCreated", evt, userSpec && userSpec[1]);
-      session.subscribe(evt.stream);
-    }).connect(cred.token, function (error) {
+  Primrose.HTTP.getObject("/tokbox/?room=" + encodeURI(roomName) + "&user=" + encodeURI(userName)).then(function (cred) {
+    session = OT.initSession(cred.apiKey, cred.sessionId);
+
+    session.on("streamCreated", function (evt) {
+      var newUserName = evt.stream.connection.data;
+      session.subscribe(evt.stream, "tokbox", {
+        subscribeToAudio: true,
+        subscribeToVideo: false,
+        insertMode: "append"
+      }, function (err, evt) {
+        if (err) {
+          console.error("tokbox stream error", error);
+        } else {
+          var vid = evt.element.querySelector("video");
+          console.log(newUserName, vid);
+          app.setAudioFromUser(newUserName, vid);
+        }
+      });
+    });
+
+    session.connect(cred.token, function (error) {
       if (error) {
-        console.error("tokbox error", error);
+        console.error("tokbox connect error", error);
       } else {
-        var publisher = OT.initPublisher();
-        publisher.publishVideo(false);
-        console.log("tokbox publisher", publisher);
+        publisher = OT.initPublisher("tokbox", {
+          publishAudio: true,
+          publishVideo: false,
+          videoSource: null,
+          name: userName,
+          style: {
+            nameDisplay: "off",
+            buttonDisplayMode: "off",
+            showControls: false
+          }
+        });
         session.publish(publisher);
       }
     });
-    console.log("tokbox session", session);
   });
 }
     if(typeof window !== "undefined") window.app = app;
