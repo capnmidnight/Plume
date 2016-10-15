@@ -58,7 +58,7 @@ function setRoomName(evt) {
   }
   else {
     defaultRoomName = names.toString();
-    ctrls.roomName.placeholder = "Room (" + defaultRoomName + ")";
+    ctrls.roomName.placeholder = defaultRoomName + " (random)";
     ctrls.roomName.value = "";
   }
   if(evt && evt.type !== "popstate"){
@@ -76,7 +76,7 @@ function setUserName(evt) {
   }
   else{
     defaultUserName = names.toString();
-    ctrls.userName.placeholder = "User (" + defaultUserName + ")";
+    ctrls.userName.placeholder = defaultUserName + " (random)";
     ctrls.userName.value = "";
   }
 }

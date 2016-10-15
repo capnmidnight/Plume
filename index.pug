@@ -39,11 +39,13 @@ html
         button#closeButton.secondary(type="button") &times;
         h2 Create your personal VR meeting room
         #roomNameRow.inputRow
-          input#roomName(type="text" placeholder="Pick a room name")
+          label(for="roomName") Room
+          input#roomName(type="text")
           button#randomRoomName.primary(type="button") &#x21bb;
         br
         #userNameRow.inputRow
-          input#userName(type="text" placeholder="Pick a username")
+          label(for="userName") User
+          input#userName(type="text")
           button#randomUserName.primary(type="button") &#x21bb;
           button#connect.primary(type="button") &rarr;
         #errorMessage(style="display:none")

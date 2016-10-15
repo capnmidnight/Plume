@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-  // start C:\Users\sean\Documents\VR\Plume\src\app.js
+    // start C:\Users\ThinkPad\Documents\VR\Plume\src\app.js
 (function(){"use strict";
 
 WebVRStandardMonitor();
@@ -56,7 +56,7 @@ function setRoomName(evt) {
     defaultRoomName = ctrls.roomName.value;
   } else {
     defaultRoomName = names.toString();
-    ctrls.roomName.placeholder = "Room (" + defaultRoomName + ")";
+    ctrls.roomName.placeholder = defaultRoomName + " (random)";
     ctrls.roomName.value = "";
   }
   if (evt && evt.type !== "popstate") {
@@ -72,7 +72,7 @@ function setUserName(evt) {
     defaultUserName = ctrls.userName.value;
   } else {
     defaultUserName = names.toString();
-    ctrls.userName.placeholder = "User (" + defaultUserName + ")";
+    ctrls.userName.placeholder = defaultUserName + " (random)";
     ctrls.userName.value = "";
   }
 }
@@ -213,7 +213,8 @@ function authSucceeded() {
     console.log("tokbox session", session);
   });
 }
-  if(typeof window !== "undefined") window.app = app;
+    if(typeof window !== "undefined") window.app = app;
 })();
-  // end C:\Users\sean\Documents\VR\Plume\src\app.js
-  ////////////////////////////////////////////////////////////////////////////////
+    // end C:\Users\ThinkPad\Documents\VR\Plume\src\app.js
+    ////////////////////////////////////////////////////////////////////////////////
+console.info("plume v0.0.2. see https://www.plumevr.com for more information.");
