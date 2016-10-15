@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-    // start C:\Users\ThinkPad\Documents\VR\Plume\src\app.js
+  // start C:\Users\ThinkPad\Documents\VR\Plume\src\app.js
 (function(){"use strict";
 
 WebVRStandardMonitor();
@@ -19,7 +19,7 @@ var ctrls = Primrose.DOM.findEverything(),
   useFog: false,
   autoScaleQuality: true,
   autoRescaleQuality: false,
-  quality: Quality.LOW,
+  quality: Quality.HIGH,
   groundTexture: 0x000000,
   backgroundColor: 0x000000,
   disableDefaultLighting: true,
@@ -235,8 +235,7 @@ function authSucceeded() {
     });
   });
 }
-    if(typeof window !== "undefined") window.app = app;
+  if(typeof window !== "undefined") window.app = app;
 })();
-    // end C:\Users\ThinkPad\Documents\VR\Plume\src\app.js
-    ////////////////////////////////////////////////////////////////////////////////
-console.info("plume v0.0.2. see https://www.plumevr.com for more information.");
+  // end C:\Users\ThinkPad\Documents\VR\Plume\src\app.js
+  ////////////////////////////////////////////////////////////////////////////////
