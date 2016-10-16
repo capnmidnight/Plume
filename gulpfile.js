@@ -1,6 +1,6 @@
 ﻿var gulp = require("gulp"),
   pkg = require("./package.json"),
-  nt = require("notiontheory-basic-build").setup(gulp, pkg),
+  nt = require("notiontheory-basic-build").setup(gulp, pkg, true),
   js = nt.js(pkg.name, "src", ["format"]),
   html = nt.html(pkg.name, ["!node_modules/**/*", "**/*.pug"]),
   css = nt.css(pkg.name, ["!node_modules/**/*", "**/*.styl"]);
