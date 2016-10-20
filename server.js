@@ -12,7 +12,7 @@ const options = require("./server/options").parse(process.argv),
     cert: maybeGetFile("../primrosevr_com.crt"),
     ca: maybeGetFile("../CACert.crt")
   },
-  isSecure = !!(keys && keys.key && keys.cert);
+  isSecure = !options.insecure && !!(keys && keys.key && keys.cert);
 
 console.log("Mode is " + options.mode);
 console.log("Serving from directory " + path);
