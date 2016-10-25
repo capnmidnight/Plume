@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-  // start D:\Documents\VR\Plume\src\app.js
+// start C:\Users\sean\Documents\VR\Plume\src\app.js
 (function(){"use strict";
 
 WebVRStandardMonitor();
@@ -235,7 +235,7 @@ function authSucceeded() {
     });
   });
 }
-  if(typeof window !== "undefined") window.app = app;
+if(typeof window !== "undefined") window.app = app;
 })();
-  // end D:\Documents\VR\Plume\src\app.js
-  ////////////////////////////////////////////////////////////////////////////////
+// end C:\Users\sean\Documents\VR\Plume\src\app.js
+////////////////////////////////////////////////////////////////////////////////
