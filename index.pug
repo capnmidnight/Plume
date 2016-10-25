@@ -22,10 +22,9 @@ html
     link(type="text/css", rel="stylesheet", href= fileRoot + "style" + cssExt)
     style #frontBuffer { background-image:url(screenshot.jpg); }
     if debug
-      script(src= fileRoot + "node_modules/pliny/pliny.js")
       script(src= fileRoot + "node_modules/jshashes/hashes.js")
       script(src= fileRoot + "../Primrose/PrimroseDependencies.js")
-      script(src= fileRoot + "../Primrose/PrimroseLib-WithDoc.js")
+      script(src= fileRoot + "../Primrose/PrimroseLib.js")
     else
       script(src= fileRoot + "node_modules/Primrose/Primrose.min.js")
     script(src="//static.opentok.com/v2/js/opentok.min.js")
