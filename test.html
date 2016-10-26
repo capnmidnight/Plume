@@ -8,21 +8,20 @@
 </head>
 <body>
   <div id="fsc">
-    <canvas id="frontBuffer" tabindex="1"></canvas>
-    <progress></progress>
+    <progress style="width:100%"></progress>
+    <canvas id="frontBuffer" tabindex="1" style="width:100%"></canvas>
     <button id="exitFullscreen" type="button" title="Exit fullscreen" style="display:none">&leftarrow;</button>
   </div>
   <div id="fsb">
     <button id="btn1" type="button">Empty button</button>
     <button id="btn2" type="button">Log button</button>
   </div>
-  <div id="errorLog"></div>
+  <div id="errorLog" style="font-size:50%;"></div>
   <script src="bare-bones-logger.min.js"></script>
   <script>logger.setup(logger.DOM, "#errorLog");</script>
-  <script src="Primrose.min.js"></script>
+  <script src="three.min.js"></script>
+  <script src="webvr-polyfill.js"></script>
   <script>
-  WebVRStandardMonitor();
-
   var fsb = document.getElementById("fsb");
   navigator.getVRDisplays().then(function(displays){
     displays.forEach(function(display){
