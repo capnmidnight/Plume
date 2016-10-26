@@ -13,8 +13,23 @@
     <button id="exitFullscreen" type="button" title="Exit fullscreen" style="display:none">&leftarrow;</button>
   </div>
   <div id="fsb"></div>
-  <script src="three.min.js"></script>
+  <script src="Primrose.min.js"></script>
   <script>
+  WebVRStandardMonitor();
+
+  var fsb = document.getElementById("fsb");
+  navigator.getVRDisplays().then(function(displays){
+    displays.forEach(function(display){
+      var button = document.createElement("button");
+      button.type = button;
+      button.onclick = function(){
+        display.requestPresent([{source: renderer.domElement}])
+      };
+      button.appendChild(document.createTextNode(display.displayName));
+      fsb.appendChild(button);
+    });
+  });
+
 function get(file, type, done) {
   if(done === undefined){
     done = type;
