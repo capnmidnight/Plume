@@ -102,6 +102,7 @@ get("house1.html", "document", function(doc){
   video.onprogress = prog.thunk;
   video.onloadmetadata = prog.thunk;
   video.oncanplay = function(){
+    video.style.display = "none";
     videoTexture = new THREE.Texture(video);
     var geometry = new THREE.PlaneBufferGeometry(1, 1),
       material = new THREE.MeshBasicMaterial({
