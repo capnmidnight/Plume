@@ -13,6 +13,9 @@
     <button id="exitFullscreen" type="button" title="Exit fullscreen" style="display:none">&leftarrow;</button>
   </div>
   <div id="fsb"></div>
+  <div id="errorLog"></div>
+  <script src="bare-bones-logger.min.js"></script>
+  <script>logger.setup(logger.DOM, "#errorLog");</script>
   <script src="Primrose.min.js"></script>
   <script>
   WebVRStandardMonitor();
