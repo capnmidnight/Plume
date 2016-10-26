@@ -12,7 +12,10 @@
     <progress></progress>
     <button id="exitFullscreen" type="button" title="Exit fullscreen" style="display:none">&leftarrow;</button>
   </div>
-  <div id="fsb"></div>
+  <div id="fsb">
+    <button id="btn1" type="button">Empty button</button>
+    <button id="btn2" type="button">Log button</button>
+  </div>
   <div id="errorLog"></div>
   <script src="bare-bones-logger.min.js"></script>
   <script>logger.setup(logger.DOM, "#errorLog");</script>
@@ -32,6 +35,10 @@
       fsb.appendChild(button);
     });
   });
+
+document.getElementById("btn2").onclick = function(){
+  console.log(performance.now());
+};
 
 function get(file, type, done) {
   if(done === undefined){
