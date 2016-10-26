@@ -91,7 +91,6 @@ var renderer = new THREE.WebGLRenderer({
   logarithmicDepthBuffer: false
 }), scene = new THREE.Scene(),
   camera = new THREE.PerspectiveCamera(75, 1, 0.01, 100),
-  video,
   videoTexture,
   lastTime;
 
@@ -99,7 +98,7 @@ renderer.sortObjects = true;
 renderer.setClearColor(0x007f00);
 
 get("house1.html", "document", function(doc){
-  video = doc.querySelector("video");
+  var video = doc.querySelector("video");
   video.onprogress = prog.thunk;
   video.onloadmetadata = prog.thunk;
   video.oncanplay = function(){
@@ -124,8 +123,8 @@ get("house1.html", "document", function(doc){
 function paint(dt){
   requestAnimationFrame(paint);
   renderer.render(scene, camera);
-  if(video && videoTexture && video.currentTime !== lastTime){
-    lastTime = video.currentTime;
+  if(videoTexture && videoTexture.image.currentTime !== lastTime){
+    lastTime = videoTexture.image.currentTime;
     videoTexture.needsUpdate = true;
   }
 }
