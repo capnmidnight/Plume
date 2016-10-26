@@ -12,6 +12,7 @@
     <button id="exitFullscreen" type="button" title="Exit fullscreen" style="display:none">&leftarrow;</button>
   </div>
   <div id="fsb"></div>
+  <script src="three.min.js"></script>
   <script>
 function get(file, type, done) {
   if(done === undefined){
@@ -82,10 +83,35 @@ var prog = {
 };
 
 var isiOS = /iP(hone|od|ad)/.test(navigator.userAgent || "");
+
+var renderer = new THREE.WebGLRenderer({
+  canvas: document.getElementById("frontBuffer"),
+  antialias: true,
+  alpha: true,
+  logarithmicDepthBuffer: false
+}), scene = new THREE.Scene(),
+  camera = new THREE.PerspectiveCamera(75, 1, 0.01, 100),
+  video,
+  videoTexture,
+  lastTime;
+
+renderer.sortObjects = true;
+renderer.setClearColor(0x007f00);
+
 get("house1.html", "document", function(doc){
-  var video = doc.querySelector("video");
+  video = doc.querySelector("video");
   video.onprogress = prog.thunk;
   video.onloadmetadata = prog.thunk;
+  video.oncanplay = function(){
+    videoTexture = new THREE.Texture(video);
+    var geometry = new THREE.PlaneBufferGeometry(1, 1),
+      material = new THREE.MeshBasicMaterial({
+        map: videoTexture
+      }),
+      mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+    mesh.position.set(0, 0, -1);
+  };
   if(isiOS && video.loop){
     video.onend = function(){
       video.play();
@@ -95,6 +121,15 @@ get("house1.html", "document", function(doc){
   video.play();
 });
 
+function paint(dt){
+  requestAnimationFrame(paint);
+  renderer.render(scene, camera);
+  if(video && video.currentTime !== lastTime){
+    lastTime = video.currentTime;
+    videoTexture.needsUpdate = true;
+  }
+}
+requestAnimationFrame(paint);
   </script>
 </body>
 </html>
