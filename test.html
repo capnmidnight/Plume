@@ -86,11 +86,6 @@ get("house1.html", "document", function(doc){
   var video = doc.querySelector("video");
   video.onprogress = prog.thunk;
   video.onloadmetadata = prog.thunk;
-  if(isiOS && video.loop){
-    video.onend = function(){
-      video.play();
-    };
-  }
   document.body.appendChild(video);
   video.play();
 });
