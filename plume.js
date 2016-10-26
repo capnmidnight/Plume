@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-// start C:\Users\sean\Documents\VR\Plume\src\app.js
+// start D:\Documents\VR\Plume\src\app.js
 (function(){"use strict";
 
 WebVRStandardMonitor();
@@ -17,6 +17,7 @@ var ctrls = Primrose.DOM.findEverything(),
     publisher = null,
     app = new Primrose.BrowserEnvironment({
   useFog: false,
+  useGaze: true,
   autoScaleQuality: true,
   autoRescaleQuality: false,
   quality: Quality.HIGH,
@@ -197,7 +198,7 @@ function authSucceeded() {
 
   Primrose.HTTP.getObject("/tokbox/?room=" + encodeURI(roomName) + "&user=" + encodeURI(userName)).then(function (cred) {
     session = OT.initSession(cred.apiKey, cred.sessionId);
-
+    console.log("session", session);
     session.on("streamCreated", function (evt) {
       var newUserName = evt.stream.connection.data;
       session.subscribe(evt.stream, "tokbox", {
@@ -237,5 +238,5 @@ function authSucceeded() {
 }
 if(typeof window !== "undefined") window.app = app;
 })();
-// end C:\Users\sean\Documents\VR\Plume\src\app.js
+// end D:\Documents\VR\Plume\src\app.js
 ////////////////////////////////////////////////////////////////////////////////
