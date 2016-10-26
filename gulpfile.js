@@ -1,9 +1,10 @@
 ﻿var gulp = require("gulp"),
   pkg = require("./package.json"),
-  nt = require("notiontheory-basic-build").setup(gulp, pkg, true),
+  build = require("notiontheory-basic-build"),
+  nt = build.setup(gulp, pkg),
   js = nt.js(pkg.name, "src", ["format"]),
-  html = nt.html(pkg.name, ["!node_modules/**/*", "**/*.pug"]),
-  css = nt.css(pkg.name, ["!node_modules/**/*", "**/*.styl"]);
+  html = nt.html(pkg.name, ["*.pug"]),
+  css = nt.css(pkg.name, ["*.styl"]);
 
 gulp.task("format", [js.format]);
 
@@ -14,19 +15,19 @@ gulp.task("default", [
 ]);
 
 gulp.task("debug", [
-  js.build,
+  js.debug,
   html.debug,
-  css.build
+  css.debug
 ]);
 
 gulp.task("test", [
-  js.build,
+  js.release,
   html.test,
-  css.build
+  css.release
 ]);
 
 gulp.task("release", [
-  js.build,
+  js.release,
   html.release,
-  css.build
+  css.release
 ]);
