@@ -124,7 +124,7 @@ get("house1.html", "document", function(doc){
 function paint(dt){
   requestAnimationFrame(paint);
   renderer.render(scene, camera);
-  if(video && video.currentTime !== lastTime){
+  if(video && videoTexture && video.currentTime !== lastTime){
     lastTime = video.currentTime;
     videoTexture.needsUpdate = true;
   }
