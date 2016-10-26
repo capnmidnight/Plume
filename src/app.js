@@ -17,6 +17,7 @@ var ctrls = Primrose.DOM.findEverything(),
 
   app = new Primrose.BrowserEnvironment({
     useFog: false,
+    useGaze: true,
     autoScaleQuality: true,
     autoRescaleQuality: false,
     quality: Quality.HIGH,
@@ -197,16 +198,16 @@ function authSucceeded() {
   app.connect(socket, userName);
   document.title = userName + " in " + roomName;
 
-  Primrose.HTTP.getObject("/tokbox/?room=" + encodeURI(roomName) + "&user=" + encodeURI(userName)).then(function (cred) {
+  Primrose.HTTP.getObject("/tokbox/?room=" + encodeURI(roomName) + "&user=" + encodeURI(userName)).then((cred) => {
     session = OT.initSession(cred.apiKey, cred.sessionId);
-
-    session.on("streamCreated", function (evt) {
+    console.log("session", session);
+    session.on("streamCreated", (evt) => {
       var newUserName = evt.stream.connection.data;
       session.subscribe(evt.stream, "tokbox", {
         subscribeToAudio: true,
         subscribeToVideo: false,
         insertMode: "append"
-      }, function(err, evt) {
+      }, (err, evt) => {
         if(err){
           console.error("tokbox stream error", error);
         }
@@ -218,7 +219,7 @@ function authSucceeded() {
       });
     });
 
-    session.connect(cred.token, function (error) {
+    session.connect(cred.token, (error) => {
       if (error) {
         console.error("tokbox connect error", error);
       } else {
