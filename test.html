@@ -82,12 +82,28 @@ var prog = {
   }
 };
 
+var isiOS = /iP(hone|od|ad)/.test(navigator.userAgent || "");
 get("house1.html", "document", function(doc){
-  var video = doc.querySelector("video");
-  video.onprogress = prog.thunk;
-  video.onloadmetadata = prog.thunk;
-  document.body.appendChild(video);
-  video.play();
+  var house = doc.querySelector("house"),
+    elems = doc.querySelectorAll("video,img"),
+    videos = [];
+  for(var i = 0; i < elems.length; ++i){
+    var elem = elems[i];
+    elem.onprogress = prog.thunk;
+    if(isiOS){
+      elem.onend = function(){
+        elem.play();
+      };
+    }
+    console.log(elem);
+    console.log(elem);
+    if(elem.tagName === "VIDEO"){
+      videos.push(elem);
+      elem.onloadmetadata = prog.thunk;
+    }
+  }
+  document.body.appendChild(house);
+  videos.forEach(function(v){ v.play(); });
 });
 
   </script>
