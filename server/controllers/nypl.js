@@ -1,7 +1,7 @@
 "use strict";
 
-const Message = require("../Message.js"),
-  getObject = require("../http/getObject");
+const Message = require("notion-node/src/Message"),
+  getObject = require("notion-node/src/http/getObject");
 
 //http://api.repo.nypl.org/
 

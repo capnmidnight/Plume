@@ -5,10 +5,10 @@
 const secure = 1,
   root = "https://service.xirsys.com/",
   domain = "www.primrosevr.com",
-  Message = require("../Message"),
-  get = require("../http/getObject"),
-  post = require("../http/postObject"),
-  del = require("../http/delObject");
+  Message = require("notion-node/src/Message"),
+  get = require("notion-node/src/http/getObject"),
+  post = require("notion-node/src/http/postObject"),
+  del = require("notion-node/src/http/delObject");
 
 function req(thunk, path, params){
   params = params || {};

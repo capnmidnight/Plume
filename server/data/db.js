@@ -1,7 +1,7 @@
 ﻿"use strict";
 
 const azure = require("azure-storage"),
-  options = require("../options").parse(process.argv),
+  options = require("notion-node/src/options").parse(process.argv),
   isDev = options.mode === "dev" || process.env.NODE_ENV === "dev",
   connectionString = isDev && require("./secrets.json").connectionString || null,
   tables = azure.createTableService(connectionString),

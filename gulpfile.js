@@ -41,4 +41,4 @@ gulp.task("release", [
   css.release
 ]);
 
-gulp.task("kablamo", build.exec("npm update && gulp bump && gulp yolo && gulp trololo"));
+gulp.task("kablamo", build.exec("npm update && gulp bump && gulp yolo"));

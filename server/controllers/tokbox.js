@@ -3,7 +3,7 @@ const OpenTok = require("opentok"),
   opentok = new OpenTok(
     API_KEY,
     process.env.OPENTOK_SECRET || require("../data/secrets.json").openTokSecret),
-  Message = require("../Message");
+  Message = require("notion-node/src/Message");
 
 function getSessionID() {
   return new Promise((resolve, reject) => {

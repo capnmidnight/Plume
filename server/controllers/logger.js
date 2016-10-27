@@ -1,12 +1,12 @@
 "use strict";
 
-const Message = require("../Message.js");
+const Message = require("notion-node/src/Message");
 
 module.exports = {
   URLPattern: /^\/logger\/?$/,
   POST: {
     "*/*": (state) => {
-      var body = state.body, 
+      var body = state.body,
         func = console[body.name];
       if (func) {
         body.args.unshift(body.name.toLocaleUpperCase() + ":> ");

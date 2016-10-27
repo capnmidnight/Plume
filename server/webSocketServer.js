@@ -2,7 +2,7 @@
 
 const User = require("./data/User"),
   activeUsers = {},
-  options = require("./options").parse(process.argv),
+  options = require("notion-node/src/options").parse(process.argv),
   isDev = options.mode === "dev" || process.env.NODE_ENV === "dev";
 
 function broadcast(evt) {
