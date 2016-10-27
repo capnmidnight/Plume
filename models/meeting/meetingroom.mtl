@@ -9,7 +9,7 @@ Ks 0.540000 0.540000 0.540000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd BackdropTexture.png
 
 newmtl ChairMaterial.001
@@ -20,7 +20,7 @@ Ks 0.540000 0.540000 0.540000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd Chair1Texture.png
 
 newmtl ChairMaterial.002
@@ -31,7 +31,7 @@ Ks 0.540000 0.540000 0.540000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd Chair2Texture.png
 
 newmtl ChairMaterial.003
@@ -42,7 +42,7 @@ Ks 0.540000 0.540000 0.540000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd Chair3Texture.png
 
 newmtl ChairMaterial.004
@@ -53,7 +53,7 @@ Ks 0.540000 0.540000 0.540000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd Chair4Texture.png
 
 newmtl CupMaterial.001
@@ -64,7 +64,7 @@ Ks 0.540000 0.540000 0.540000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd Cup1Texture.png
 
 newmtl CupMaterial.002
@@ -75,7 +75,7 @@ Ks 0.540000 0.540000 0.540000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd Cup2Texture.png
 
 newmtl CupMaterial.003
@@ -86,7 +86,7 @@ Ks 0.540000 0.540000 0.540000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd Cup3Texture.png
 
 newmtl CupMaterial.004
@@ -97,7 +97,7 @@ Ks 0.540000 0.540000 0.540000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd Cup4Texture.png
 
 newmtl CupMaterial.005
@@ -108,7 +108,7 @@ Ks 0.540000 0.540000 0.540000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd Cup5Texture.png
 
 newmtl LampPostMaterial
@@ -119,7 +119,7 @@ Ks 0.774000 0.774000 0.774000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 
 newmtl LampshadeMaterial
 Ns 0.000000
@@ -150,7 +150,7 @@ Ks 0.540000 0.540000 0.540000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd RoomTexture.png
 
 newmtl TableMaterial
@@ -161,5 +161,5 @@ Ks 0.393270 0.393270 0.393270
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-illum 2
+illum 0
 map_Kd TableTexture.png
