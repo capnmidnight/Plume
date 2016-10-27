@@ -1,4 +1,7 @@
 WebVRStandardMonitor();
+
+prog.bar.style.height = "10px";
+
 var ctrls = Primrose.DOM.findEverything(),
   loginControls = [
     ctrls.userName,
@@ -27,7 +30,8 @@ var ctrls = Primrose.DOM.findEverything(),
     sceneModel: "models/meeting/meetingroom.obj",
     avatarModel: "models/avatar.json",
     font: "fonts/helvetiker_regular.typeface.json",
-    disableWebRTC: true
+    disableWebRTC: true,
+    progress: prog.thunk
   });
 
 ctrls.closeButton.addEventListener("click", hideLoginForm, false);
@@ -119,6 +123,7 @@ function disableLogin(v) {
 }
 
 function environmentReady() {
+  prog.bar.style.display = "none";
   ctrls.loginForm.style.display = "";
 
   window.addEventListener("vrdisplaypresentchange", () => {
