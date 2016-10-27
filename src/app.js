@@ -126,24 +126,13 @@ function environmentReady() {
     ctrls.controls.style.display = currDev && currDev.isPresenting ? "none" : "";
   });
 
-  app.displays.forEach(function(display, i){
-    var btn = document.createElement( "button" ),
+  app.displays.forEach((display, i) => {
+    const btn = document.createElement("button"),
       isStereo = Primrose.Input.VR.isStereoDisplay(display),
       enterVR = app.goFullScreen.bind(app, i);
     btn.type = "button";
-    btn.className = "primary";
-    btn.innerHTML = display.displayName;
-    btn.addEventListener( "click", enterVR);
-    window.addEventListener("vrdisplayactivate", function(display, enterVR, evt){
-      if(evt.display === display) {
-        var exitVR = function(){
-          window.removeEventListener("vrdisplaydeactivate", exitVR);
-          app.input.VR.cancel();
-        };
-        window.addEventListener("vrdisplaydeactivate", exitVR, false);
-        enterVR();
-      }
-    }.bind(window, display, enterVR), false);
+    btn.appendChild(document.createTextNode(display.displayName));
+    btn.addEventListener("click", enterVR, false);
     ctrls.fullScreenButtonContainer.appendChild(btn);
   });
 
