@@ -23,7 +23,7 @@ html
     style #frontBuffer { background-image:url(screenshot.jpg); }
     if debug
       script window.DEBUG = true;
-      script(src=fileRoot + "node_modules/bare-bones-logger/bare-bones-logger" + jsExt)
+      script(src=fileRoot + "../bare-bones-logger/bare-bones-logger" + jsExt)
       script logger.setup(logger.HTTP, "/logger");
       script(src= fileRoot + "node_modules/jshashes/hashes.js")
       script(src= fileRoot + "../Primrose/PrimroseDependencies" + jsExt)
