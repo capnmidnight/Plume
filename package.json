@@ -22,7 +22,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node server.js --mode=dev --path=.. --url=Plume/"
+    "test": "node server.js --mode=dev --path=.. --url=Plume/",
+    "legend": "node server.js --mode=dev --path=.. --url=Legend3D/"
   },
   "repository": {
     "type": "git",

@@ -22,15 +22,17 @@ html
     link(type="text/css", rel="stylesheet", href= fileRoot + "style" + cssExt)
     style #frontBuffer { background-image:url(screenshot.jpg); }
     if debug
+      script window.DEBUG = true;
+      script(src=fileRoot + "node_modules/bare-bones-logger/bare-bones-logger" + jsExt)
+      script logger.setup(logger.HTTP, "/logger");
       script(src= fileRoot + "node_modules/jshashes/hashes.js")
-      script(src= fileRoot + "../Primrose/PrimroseDependencies.js")
-      script(src= fileRoot + "../Primrose/PrimroseLib.js")
-    else
-      script(src= fileRoot + "node_modules/Primrose/Primrose.min.js")
+      script(src= fileRoot + "../Primrose/PrimroseDependencies" + jsExt)
+      script(src= fileRoot + "../Primrose/PrimroseLib" + jsExt)
     script(src="//static.opentok.com/v2/js/opentok.min.js")
   body
     h1 Meeting Room
     canvas#frontBuffer
+    progress
     #controls
       #fullScreenButtonContainer
       #tokbox
@@ -48,4 +50,7 @@ html
           button#randomUserName.primary(type="button") &#x21bb;
           button#connect.primary(type="button") &rarr;
         #errorMessage(style="display:none")
-    script(src= fileRoot + packageName + jsExt)
+    if debug
+      script(src= fileRoot + "pre" + jsExt, data-app=fileRoot + packageName + "Lib" + jsExt)
+    else
+      script(src= fileRoot + "pre" + jsExt, data-app=fileRoot + packageName + jsExt)
