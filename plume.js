@@ -1,232 +1,1768 @@
-(function (root) {
+/**
+ * jshashes - https://github.com/h2non/jshashes
+ * Released under the "New BSD" license
+ *
+ * Algorithms specification:
+ *
+ * MD5 - http://www.ietf.org/rfc/rfc1321.txt
+ * RIPEMD-160 - http://homes.esat.kuleuven.be/~bosselae/ripemd160.html
+ * SHA1   - http://csrc.nist.gov/publications/fips/fips180-4/fips-180-4.pdf
+ * SHA256 - http://csrc.nist.gov/publications/fips/fips180-4/fips-180-4.pdf
+ * SHA512 - http://csrc.nist.gov/publications/fips/fips180-4/fips-180-4.pdf
+ * HMAC - http://www.ietf.org/rfc/rfc2104.txt
+ */
+(function() {
+  var Hashes;
 
-  // Store setTimeout reference so promise-polyfill will be unaffected by
-  // other code modifying setTimeout (like sinon.useFakeTimers())
-  var setTimeoutFunc = setTimeout;
+  function utf8Encode(str) {
+    var x, y, output = '',
+      i = -1,
+      l;
 
-  function noop() {
-  }
-
-  // Use polyfill for setImmediate for performance gains
-  var asap = (typeof setImmediate === 'function' && setImmediate) ||
-    function (fn) {
-      setTimeoutFunc(fn, 0);
-    };
-
-  var onUnhandledRejection = function onUnhandledRejection(err) {
-    if (typeof console !== 'undefined' && console) {
-      console.warn('Possible Unhandled Promise Rejection:', err); // eslint-disable-line no-console
-    }
-  };
-
-  // Polyfill for Function.prototype.bind
-  function bind(fn, thisArg) {
-    return function () {
-      fn.apply(thisArg, arguments);
-    };
-  }
-
-  function Promise(fn) {
-    if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');
-    if (typeof fn !== 'function') throw new TypeError('not a function');
-    this._state = 0;
-    this._handled = false;
-    this._value = undefined;
-    this._deferreds = [];
-
-    doResolve(fn, this);
-  }
-
-  function handle(self, deferred) {
-    while (self._state === 3) {
-      self = self._value;
-    }
-    if (self._state === 0) {
-      self._deferreds.push(deferred);
-      return;
-    }
-    self._handled = true;
-    asap(function () {
-      var cb = self._state === 1 ? deferred.onFulfilled : deferred.onRejected;
-      if (cb === null) {
-        (self._state === 1 ? resolve : reject)(deferred.promise, self._value);
-        return;
-      }
-      var ret;
-      try {
-        ret = cb(self._value);
-      } catch (e) {
-        reject(deferred.promise, e);
-        return;
-      }
-      resolve(deferred.promise, ret);
-    });
-  }
-
-  function resolve(self, newValue) {
-    try {
-      // Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
-      if (newValue === self) throw new TypeError('A promise cannot be resolved with itself.');
-      if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
-        var then = newValue.then;
-        if (newValue instanceof Promise) {
-          self._state = 3;
-          self._value = newValue;
-          finale(self);
-          return;
-        } else if (typeof then === 'function') {
-          doResolve(bind(then, newValue), self);
-          return;
+    if (str && str.length) {
+      l = str.length;
+      while ((i += 1) < l) {
+        /* Decode utf-16 surrogate pairs */
+        x = str.charCodeAt(i);
+        y = i + 1 < l ? str.charCodeAt(i + 1) : 0;
+        if (0xD800 <= x && x <= 0xDBFF && 0xDC00 <= y && y <= 0xDFFF) {
+          x = 0x10000 + ((x & 0x03FF) << 10) + (y & 0x03FF);
+          i += 1;
+        }
+        /* Encode output as utf-8 */
+        if (x <= 0x7F) {
+          output += String.fromCharCode(x);
+        } else if (x <= 0x7FF) {
+          output += String.fromCharCode(0xC0 | ((x >>> 6) & 0x1F),
+            0x80 | (x & 0x3F));
+        } else if (x <= 0xFFFF) {
+          output += String.fromCharCode(0xE0 | ((x >>> 12) & 0x0F),
+            0x80 | ((x >>> 6) & 0x3F),
+            0x80 | (x & 0x3F));
+        } else if (x <= 0x1FFFFF) {
+          output += String.fromCharCode(0xF0 | ((x >>> 18) & 0x07),
+            0x80 | ((x >>> 12) & 0x3F),
+            0x80 | ((x >>> 6) & 0x3F),
+            0x80 | (x & 0x3F));
         }
       }
-      self._state = 1;
-      self._value = newValue;
-      finale(self);
-    } catch (e) {
-      reject(self, e);
     }
+    return output;
   }
 
-  function reject(self, newValue) {
-    self._state = 2;
-    self._value = newValue;
-    finale(self);
-  }
+  function utf8Decode(str) {
+    var i, ac, c1, c2, c3, arr = [],
+      l;
+    i = ac = c1 = c2 = c3 = 0;
 
-  function finale(self) {
-    if (self._state === 2 && self._deferreds.length === 0) {
-      asap(function() {
-        if (!self._handled) {
-          onUnhandledRejection(self._value);
+    if (str && str.length) {
+      l = str.length;
+      str += '';
+
+      while (i < l) {
+        c1 = str.charCodeAt(i);
+        ac += 1;
+        if (c1 < 128) {
+          arr[ac] = String.fromCharCode(c1);
+          i += 1;
+        } else if (c1 > 191 && c1 < 224) {
+          c2 = str.charCodeAt(i + 1);
+          arr[ac] = String.fromCharCode(((c1 & 31) << 6) | (c2 & 63));
+          i += 2;
+        } else {
+          c2 = str.charCodeAt(i + 1);
+          c3 = str.charCodeAt(i + 2);
+          arr[ac] = String.fromCharCode(((c1 & 15) << 12) | ((c2 & 63) << 6) | (c3 & 63));
+          i += 3;
         }
-      });
+      }
     }
-
-    for (var i = 0, len = self._deferreds.length; i < len; i++) {
-      handle(self, self._deferreds[i]);
-    }
-    self._deferreds = null;
-  }
-
-  function Handler(onFulfilled, onRejected, promise) {
-    this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
-    this.onRejected = typeof onRejected === 'function' ? onRejected : null;
-    this.promise = promise;
+    return arr.join('');
   }
 
   /**
-   * Take a potentially misbehaving resolver function and make sure
-   * onFulfilled and onRejected are only called once.
-   *
-   * Makes no guarantees about asynchrony.
+   * Add integers, wrapping at 2^32. This uses 16-bit operations internally
+   * to work around bugs in some JS interpreters.
    */
-  function doResolve(fn, self) {
-    var done = false;
-    try {
-      fn(function (value) {
-        if (done) return;
-        done = true;
-        resolve(self, value);
-      }, function (reason) {
-        if (done) return;
-        done = true;
-        reject(self, reason);
-      });
-    } catch (ex) {
-      if (done) return;
-      done = true;
-      reject(self, ex);
-    }
+
+  function safe_add(x, y) {
+    var lsw = (x & 0xFFFF) + (y & 0xFFFF),
+      msw = (x >> 16) + (y >> 16) + (lsw >> 16);
+    return (msw << 16) | (lsw & 0xFFFF);
   }
 
-  Promise.prototype['catch'] = function (onRejected) {
-    return this.then(null, onRejected);
-  };
+  /**
+   * Bitwise rotate a 32-bit number to the left.
+   */
 
-  Promise.prototype.then = function (onFulfilled, onRejected) {
-    var prom = new (this.constructor)(noop);
+  function bit_rol(num, cnt) {
+    return (num << cnt) | (num >>> (32 - cnt));
+  }
 
-    handle(this, new Handler(onFulfilled, onRejected, prom));
-    return prom;
-  };
+  /**
+   * Convert a raw string to a hex string
+   */
 
-  Promise.all = function (arr) {
-    var args = Array.prototype.slice.call(arr);
+  function rstr2hex(input, hexcase) {
+    var hex_tab = hexcase ? '0123456789ABCDEF' : '0123456789abcdef',
+      output = '',
+      x, i = 0,
+      l = input.length;
+    for (; i < l; i += 1) {
+      x = input.charCodeAt(i);
+      output += hex_tab.charAt((x >>> 4) & 0x0F) + hex_tab.charAt(x & 0x0F);
+    }
+    return output;
+  }
 
-    return new Promise(function (resolve, reject) {
-      if (args.length === 0) return resolve([]);
-      var remaining = args.length;
+  /**
+   * Encode a string as utf-16
+   */
 
-      function res(i, val) {
-        try {
-          if (val && (typeof val === 'object' || typeof val === 'function')) {
-            var then = val.then;
-            if (typeof then === 'function') {
-              then.call(val, function (val) {
-                res(i, val);
-              }, reject);
-              return;
+  function str2rstr_utf16le(input) {
+    var i, l = input.length,
+      output = '';
+    for (i = 0; i < l; i += 1) {
+      output += String.fromCharCode(input.charCodeAt(i) & 0xFF, (input.charCodeAt(i) >>> 8) & 0xFF);
+    }
+    return output;
+  }
+
+  function str2rstr_utf16be(input) {
+    var i, l = input.length,
+      output = '';
+    for (i = 0; i < l; i += 1) {
+      output += String.fromCharCode((input.charCodeAt(i) >>> 8) & 0xFF, input.charCodeAt(i) & 0xFF);
+    }
+    return output;
+  }
+
+  /**
+   * Convert an array of big-endian words to a string
+   */
+
+  function binb2rstr(input) {
+    var i, l = input.length * 32,
+      output = '';
+    for (i = 0; i < l; i += 8) {
+      output += String.fromCharCode((input[i >> 5] >>> (24 - i % 32)) & 0xFF);
+    }
+    return output;
+  }
+
+  /**
+   * Convert an array of little-endian words to a string
+   */
+
+  function binl2rstr(input) {
+    var i, l = input.length * 32,
+      output = '';
+    for (i = 0; i < l; i += 8) {
+      output += String.fromCharCode((input[i >> 5] >>> (i % 32)) & 0xFF);
+    }
+    return output;
+  }
+
+  /**
+   * Convert a raw string to an array of little-endian words
+   * Characters >255 have their high-byte silently ignored.
+   */
+
+  function rstr2binl(input) {
+    var i, l = input.length * 8,
+      output = Array(input.length >> 2),
+      lo = output.length;
+    for (i = 0; i < lo; i += 1) {
+      output[i] = 0;
+    }
+    for (i = 0; i < l; i += 8) {
+      output[i >> 5] |= (input.charCodeAt(i / 8) & 0xFF) << (i % 32);
+    }
+    return output;
+  }
+
+  /**
+   * Convert a raw string to an array of big-endian words
+   * Characters >255 have their high-byte silently ignored.
+   */
+
+  function rstr2binb(input) {
+    var i, l = input.length * 8,
+      output = Array(input.length >> 2),
+      lo = output.length;
+    for (i = 0; i < lo; i += 1) {
+      output[i] = 0;
+    }
+    for (i = 0; i < l; i += 8) {
+      output[i >> 5] |= (input.charCodeAt(i / 8) & 0xFF) << (24 - i % 32);
+    }
+    return output;
+  }
+
+  /**
+   * Convert a raw string to an arbitrary string encoding
+   */
+
+  function rstr2any(input, encoding) {
+    var divisor = encoding.length,
+      remainders = Array(),
+      i, q, x, ld, quotient, dividend, output, full_length;
+
+    /* Convert to an array of 16-bit big-endian values, forming the dividend */
+    dividend = Array(Math.ceil(input.length / 2));
+    ld = dividend.length;
+    for (i = 0; i < ld; i += 1) {
+      dividend[i] = (input.charCodeAt(i * 2) << 8) | input.charCodeAt(i * 2 + 1);
+    }
+
+    /**
+     * Repeatedly perform a long division. The binary array forms the dividend,
+     * the length of the encoding is the divisor. Once computed, the quotient
+     * forms the dividend for the next step. We stop when the dividend is zerHashes.
+     * All remainders are stored for later use.
+     */
+    while (dividend.length > 0) {
+      quotient = Array();
+      x = 0;
+      for (i = 0; i < dividend.length; i += 1) {
+        x = (x << 16) + dividend[i];
+        q = Math.floor(x / divisor);
+        x -= q * divisor;
+        if (quotient.length > 0 || q > 0) {
+          quotient[quotient.length] = q;
+        }
+      }
+      remainders[remainders.length] = x;
+      dividend = quotient;
+    }
+
+    /* Convert the remainders to the output string */
+    output = '';
+    for (i = remainders.length - 1; i >= 0; i--) {
+      output += encoding.charAt(remainders[i]);
+    }
+
+    /* Append leading zero equivalents */
+    full_length = Math.ceil(input.length * 8 / (Math.log(encoding.length) / Math.log(2)));
+    for (i = output.length; i < full_length; i += 1) {
+      output = encoding[0] + output;
+    }
+    return output;
+  }
+
+  /**
+   * Convert a raw string to a base-64 string
+   */
+
+  function rstr2b64(input, b64pad) {
+    var tab = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
+      output = '',
+      len = input.length,
+      i, j, triplet;
+    b64pad = b64pad || '=';
+    for (i = 0; i < len; i += 3) {
+      triplet = (input.charCodeAt(i) << 16) | (i + 1 < len ? input.charCodeAt(i + 1) << 8 : 0) | (i + 2 < len ? input.charCodeAt(i + 2) : 0);
+      for (j = 0; j < 4; j += 1) {
+        if (i * 8 + j * 6 > input.length * 8) {
+          output += b64pad;
+        } else {
+          output += tab.charAt((triplet >>> 6 * (3 - j)) & 0x3F);
+        }
+      }
+    }
+    return output;
+  }
+
+  Hashes = {
+    /**
+     * @property {String} version
+     * @readonly
+     */
+    VERSION: '1.0.5',
+    /**
+     * @member Hashes
+     * @class Base64
+     * @constructor
+     */
+    Base64: function() {
+      // private properties
+      var tab = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
+        pad = '=', // default pad according with the RFC standard
+        url = false, // URL encoding support @todo
+        utf8 = true; // by default enable UTF-8 support encoding
+
+      // public method for encoding
+      this.encode = function(input) {
+        var i, j, triplet,
+          output = '',
+          len = input.length;
+
+        pad = pad || '=';
+        input = (utf8) ? utf8Encode(input) : input;
+
+        for (i = 0; i < len; i += 3) {
+          triplet = (input.charCodeAt(i) << 16) | (i + 1 < len ? input.charCodeAt(i + 1) << 8 : 0) | (i + 2 < len ? input.charCodeAt(i + 2) : 0);
+          for (j = 0; j < 4; j += 1) {
+            if (i * 8 + j * 6 > len * 8) {
+              output += pad;
+            } else {
+              output += tab.charAt((triplet >>> 6 * (3 - j)) & 0x3F);
             }
           }
-          args[i] = val;
-          if (--remaining === 0) {
-            resolve(args);
-          }
-        } catch (ex) {
-          reject(ex);
         }
+        return output;
+      };
+
+      // public method for decoding
+      this.decode = function(input) {
+        // var b64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+        var i, o1, o2, o3, h1, h2, h3, h4, bits, ac,
+          dec = '',
+          arr = [];
+        if (!input) {
+          return input;
+        }
+
+        i = ac = 0;
+        input = input.replace(new RegExp('\\' + pad, 'gi'), ''); // use '='
+        //input += '';
+
+        do { // unpack four hexets into three octets using index points in b64
+          h1 = tab.indexOf(input.charAt(i += 1));
+          h2 = tab.indexOf(input.charAt(i += 1));
+          h3 = tab.indexOf(input.charAt(i += 1));
+          h4 = tab.indexOf(input.charAt(i += 1));
+
+          bits = h1 << 18 | h2 << 12 | h3 << 6 | h4;
+
+          o1 = bits >> 16 & 0xff;
+          o2 = bits >> 8 & 0xff;
+          o3 = bits & 0xff;
+          ac += 1;
+
+          if (h3 === 64) {
+            arr[ac] = String.fromCharCode(o1);
+          } else if (h4 === 64) {
+            arr[ac] = String.fromCharCode(o1, o2);
+          } else {
+            arr[ac] = String.fromCharCode(o1, o2, o3);
+          }
+        } while (i < input.length);
+
+        dec = arr.join('');
+        dec = (utf8) ? utf8Decode(dec) : dec;
+
+        return dec;
+      };
+
+      // set custom pad string
+      this.setPad = function(str) {
+        pad = str || pad;
+        return this;
+      };
+      // set custom tab string characters
+      this.setTab = function(str) {
+        tab = str || tab;
+        return this;
+      };
+      this.setUTF8 = function(bool) {
+        if (typeof bool === 'boolean') {
+          utf8 = bool;
+        }
+        return this;
+      };
+    },
+
+    /**
+     * CRC-32 calculation
+     * @member Hashes
+     * @method CRC32
+     * @static
+     * @param {String} str Input String
+     * @return {String}
+     */
+    CRC32: function(str) {
+      var crc = 0,
+        x = 0,
+        y = 0,
+        table, i, iTop;
+      str = utf8Encode(str);
+
+      table = [
+        '00000000 77073096 EE0E612C 990951BA 076DC419 706AF48F E963A535 9E6495A3 0EDB8832 ',
+        '79DCB8A4 E0D5E91E 97D2D988 09B64C2B 7EB17CBD E7B82D07 90BF1D91 1DB71064 6AB020F2 F3B97148 ',
+        '84BE41DE 1ADAD47D 6DDDE4EB F4D4B551 83D385C7 136C9856 646BA8C0 FD62F97A 8A65C9EC 14015C4F ',
+        '63066CD9 FA0F3D63 8D080DF5 3B6E20C8 4C69105E D56041E4 A2677172 3C03E4D1 4B04D447 D20D85FD ',
+        'A50AB56B 35B5A8FA 42B2986C DBBBC9D6 ACBCF940 32D86CE3 45DF5C75 DCD60DCF ABD13D59 26D930AC ',
+        '51DE003A C8D75180 BFD06116 21B4F4B5 56B3C423 CFBA9599 B8BDA50F 2802B89E 5F058808 C60CD9B2 ',
+        'B10BE924 2F6F7C87 58684C11 C1611DAB B6662D3D 76DC4190 01DB7106 98D220BC EFD5102A 71B18589 ',
+        '06B6B51F 9FBFE4A5 E8B8D433 7807C9A2 0F00F934 9609A88E E10E9818 7F6A0DBB 086D3D2D 91646C97 ',
+        'E6635C01 6B6B51F4 1C6C6162 856530D8 F262004E 6C0695ED 1B01A57B 8208F4C1 F50FC457 65B0D9C6 ',
+        '12B7E950 8BBEB8EA FCB9887C 62DD1DDF 15DA2D49 8CD37CF3 FBD44C65 4DB26158 3AB551CE A3BC0074 ',
+        'D4BB30E2 4ADFA541 3DD895D7 A4D1C46D D3D6F4FB 4369E96A 346ED9FC AD678846 DA60B8D0 44042D73 ',
+        '33031DE5 AA0A4C5F DD0D7CC9 5005713C 270241AA BE0B1010 C90C2086 5768B525 206F85B3 B966D409 ',
+        'CE61E49F 5EDEF90E 29D9C998 B0D09822 C7D7A8B4 59B33D17 2EB40D81 B7BD5C3B C0BA6CAD EDB88320 ',
+        '9ABFB3B6 03B6E20C 74B1D29A EAD54739 9DD277AF 04DB2615 73DC1683 E3630B12 94643B84 0D6D6A3E ',
+        '7A6A5AA8 E40ECF0B 9309FF9D 0A00AE27 7D079EB1 F00F9344 8708A3D2 1E01F268 6906C2FE F762575D ',
+        '806567CB 196C3671 6E6B06E7 FED41B76 89D32BE0 10DA7A5A 67DD4ACC F9B9DF6F 8EBEEFF9 17B7BE43 ',
+        '60B08ED5 D6D6A3E8 A1D1937E 38D8C2C4 4FDFF252 D1BB67F1 A6BC5767 3FB506DD 48B2364B D80D2BDA ',
+        'AF0A1B4C 36034AF6 41047A60 DF60EFC3 A867DF55 316E8EEF 4669BE79 CB61B38C BC66831A 256FD2A0 ',
+        '5268E236 CC0C7795 BB0B4703 220216B9 5505262F C5BA3BBE B2BD0B28 2BB45A92 5CB36A04 C2D7FFA7 ',
+        'B5D0CF31 2CD99E8B 5BDEAE1D 9B64C2B0 EC63F226 756AA39C 026D930A 9C0906A9 EB0E363F 72076785 ',
+        '05005713 95BF4A82 E2B87A14 7BB12BAE 0CB61B38 92D28E9B E5D5BE0D 7CDCEFB7 0BDBDF21 86D3D2D4 ',
+        'F1D4E242 68DDB3F8 1FDA836E 81BE16CD F6B9265B 6FB077E1 18B74777 88085AE6 FF0F6A70 66063BCA ',
+        '11010B5C 8F659EFF F862AE69 616BFFD3 166CCF45 A00AE278 D70DD2EE 4E048354 3903B3C2 A7672661 ',
+        'D06016F7 4969474D 3E6E77DB AED16A4A D9D65ADC 40DF0B66 37D83BF0 A9BCAE53 DEBB9EC5 47B2CF7F ',
+        '30B5FFE9 BDBDF21C CABAC28A 53B39330 24B4A3A6 BAD03605 CDD70693 54DE5729 23D967BF B3667A2E ',
+        'C4614AB8 5D681B02 2A6F2B94 B40BBE37 C30C8EA1 5A05DF1B 2D02EF8D'
+      ].join('');
+
+      crc = crc ^ (-1);
+      for (i = 0, iTop = str.length; i < iTop; i += 1) {
+        y = (crc ^ str.charCodeAt(i)) & 0xFF;
+        x = '0x' + table.substr(y * 9, 8);
+        crc = (crc >>> 8) ^ x;
+      }
+      // always return a positive number (that's what >>> 0 does)
+      return (crc ^ (-1)) >>> 0;
+    },
+    /**
+     * @member Hashes
+     * @class MD5
+     * @constructor
+     * @param {Object} [config]
+     *
+     * A JavaScript implementation of the RSA Data Security, Inc. MD5 Message
+     * Digest Algorithm, as defined in RFC 1321.
+     * Version 2.2 Copyright (C) Paul Johnston 1999 - 2009
+     * Other contributors: Greg Holt, Andrew Kepert, Ydnar, Lostinet
+     * See <http://pajhome.org.uk/crypt/md5> for more infHashes.
+     */
+    MD5: function(options) {
+      /**
+       * Private config properties. You may need to tweak these to be compatible with
+       * the server-side, but the defaults work in most cases.
+       * See {@link Hashes.MD5#method-setUpperCase} and {@link Hashes.SHA1#method-setUpperCase}
+       */
+      var hexcase = (options && typeof options.uppercase === 'boolean') ? options.uppercase : false, // hexadecimal output case format. false - lowercase; true - uppercase
+        b64pad = (options && typeof options.pad === 'string') ? options.pda : '=', // base-64 pad character. Defaults to '=' for strict RFC compliance
+        utf8 = (options && typeof options.utf8 === 'boolean') ? options.utf8 : true; // enable/disable utf8 encoding
+
+      // privileged (public) methods
+      this.hex = function(s) {
+        return rstr2hex(rstr(s, utf8), hexcase);
+      };
+      this.b64 = function(s) {
+        return rstr2b64(rstr(s), b64pad);
+      };
+      this.any = function(s, e) {
+        return rstr2any(rstr(s, utf8), e);
+      };
+      this.raw = function(s) {
+        return rstr(s, utf8);
+      };
+      this.hex_hmac = function(k, d) {
+        return rstr2hex(rstr_hmac(k, d), hexcase);
+      };
+      this.b64_hmac = function(k, d) {
+        return rstr2b64(rstr_hmac(k, d), b64pad);
+      };
+      this.any_hmac = function(k, d, e) {
+        return rstr2any(rstr_hmac(k, d), e);
+      };
+      /**
+       * Perform a simple self-test to see if the VM is working
+       * @return {String} Hexadecimal hash sample
+       */
+      this.vm_test = function() {
+        return hex('abc').toLowerCase() === '900150983cd24fb0d6963f7d28e17f72';
+      };
+      /**
+       * Enable/disable uppercase hexadecimal returned string
+       * @param {Boolean}
+       * @return {Object} this
+       */
+      this.setUpperCase = function(a) {
+        if (typeof a === 'boolean') {
+          hexcase = a;
+        }
+        return this;
+      };
+      /**
+       * Defines a base64 pad string
+       * @param {String} Pad
+       * @return {Object} this
+       */
+      this.setPad = function(a) {
+        b64pad = a || b64pad;
+        return this;
+      };
+      /**
+       * Defines a base64 pad string
+       * @param {Boolean}
+       * @return {Object} [this]
+       */
+      this.setUTF8 = function(a) {
+        if (typeof a === 'boolean') {
+          utf8 = a;
+        }
+        return this;
+      };
+
+      // private methods
+
+      /**
+       * Calculate the MD5 of a raw string
+       */
+
+      function rstr(s) {
+        s = (utf8) ? utf8Encode(s) : s;
+        return binl2rstr(binl(rstr2binl(s), s.length * 8));
       }
 
-      for (var i = 0; i < args.length; i++) {
-        res(i, args[i]);
+      /**
+       * Calculate the HMAC-MD5, of a key and some data (raw strings)
+       */
+
+      function rstr_hmac(key, data) {
+        var bkey, ipad, opad, hash, i;
+
+        key = (utf8) ? utf8Encode(key) : key;
+        data = (utf8) ? utf8Encode(data) : data;
+        bkey = rstr2binl(key);
+        if (bkey.length > 16) {
+          bkey = binl(bkey, key.length * 8);
+        }
+
+        ipad = Array(16), opad = Array(16);
+        for (i = 0; i < 16; i += 1) {
+          ipad[i] = bkey[i] ^ 0x36363636;
+          opad[i] = bkey[i] ^ 0x5C5C5C5C;
+        }
+        hash = binl(ipad.concat(rstr2binl(data)), 512 + data.length * 8);
+        return binl2rstr(binl(opad.concat(hash), 512 + 128));
       }
-    });
+
+      /**
+       * Calculate the MD5 of an array of little-endian words, and a bit length.
+       */
+
+      function binl(x, len) {
+        var i, olda, oldb, oldc, oldd,
+          a = 1732584193,
+          b = -271733879,
+          c = -1732584194,
+          d = 271733878;
+
+        /* append padding */
+        x[len >> 5] |= 0x80 << ((len) % 32);
+        x[(((len + 64) >>> 9) << 4) + 14] = len;
+
+        for (i = 0; i < x.length; i += 16) {
+          olda = a;
+          oldb = b;
+          oldc = c;
+          oldd = d;
+
+          a = md5_ff(a, b, c, d, x[i + 0], 7, -680876936);
+          d = md5_ff(d, a, b, c, x[i + 1], 12, -389564586);
+          c = md5_ff(c, d, a, b, x[i + 2], 17, 606105819);
+          b = md5_ff(b, c, d, a, x[i + 3], 22, -1044525330);
+          a = md5_ff(a, b, c, d, x[i + 4], 7, -176418897);
+          d = md5_ff(d, a, b, c, x[i + 5], 12, 1200080426);
+          c = md5_ff(c, d, a, b, x[i + 6], 17, -1473231341);
+          b = md5_ff(b, c, d, a, x[i + 7], 22, -45705983);
+          a = md5_ff(a, b, c, d, x[i + 8], 7, 1770035416);
+          d = md5_ff(d, a, b, c, x[i + 9], 12, -1958414417);
+          c = md5_ff(c, d, a, b, x[i + 10], 17, -42063);
+          b = md5_ff(b, c, d, a, x[i + 11], 22, -1990404162);
+          a = md5_ff(a, b, c, d, x[i + 12], 7, 1804603682);
+          d = md5_ff(d, a, b, c, x[i + 13], 12, -40341101);
+          c = md5_ff(c, d, a, b, x[i + 14], 17, -1502002290);
+          b = md5_ff(b, c, d, a, x[i + 15], 22, 1236535329);
+
+          a = md5_gg(a, b, c, d, x[i + 1], 5, -165796510);
+          d = md5_gg(d, a, b, c, x[i + 6], 9, -1069501632);
+          c = md5_gg(c, d, a, b, x[i + 11], 14, 643717713);
+          b = md5_gg(b, c, d, a, x[i + 0], 20, -373897302);
+          a = md5_gg(a, b, c, d, x[i + 5], 5, -701558691);
+          d = md5_gg(d, a, b, c, x[i + 10], 9, 38016083);
+          c = md5_gg(c, d, a, b, x[i + 15], 14, -660478335);
+          b = md5_gg(b, c, d, a, x[i + 4], 20, -405537848);
+          a = md5_gg(a, b, c, d, x[i + 9], 5, 568446438);
+          d = md5_gg(d, a, b, c, x[i + 14], 9, -1019803690);
+          c = md5_gg(c, d, a, b, x[i + 3], 14, -187363961);
+          b = md5_gg(b, c, d, a, x[i + 8], 20, 1163531501);
+          a = md5_gg(a, b, c, d, x[i + 13], 5, -1444681467);
+          d = md5_gg(d, a, b, c, x[i + 2], 9, -51403784);
+          c = md5_gg(c, d, a, b, x[i + 7], 14, 1735328473);
+          b = md5_gg(b, c, d, a, x[i + 12], 20, -1926607734);
+
+          a = md5_hh(a, b, c, d, x[i + 5], 4, -378558);
+          d = md5_hh(d, a, b, c, x[i + 8], 11, -2022574463);
+          c = md5_hh(c, d, a, b, x[i + 11], 16, 1839030562);
+          b = md5_hh(b, c, d, a, x[i + 14], 23, -35309556);
+          a = md5_hh(a, b, c, d, x[i + 1], 4, -1530992060);
+          d = md5_hh(d, a, b, c, x[i + 4], 11, 1272893353);
+          c = md5_hh(c, d, a, b, x[i + 7], 16, -155497632);
+          b = md5_hh(b, c, d, a, x[i + 10], 23, -1094730640);
+          a = md5_hh(a, b, c, d, x[i + 13], 4, 681279174);
+          d = md5_hh(d, a, b, c, x[i + 0], 11, -358537222);
+          c = md5_hh(c, d, a, b, x[i + 3], 16, -722521979);
+          b = md5_hh(b, c, d, a, x[i + 6], 23, 76029189);
+          a = md5_hh(a, b, c, d, x[i + 9], 4, -640364487);
+          d = md5_hh(d, a, b, c, x[i + 12], 11, -421815835);
+          c = md5_hh(c, d, a, b, x[i + 15], 16, 530742520);
+          b = md5_hh(b, c, d, a, x[i + 2], 23, -995338651);
+
+          a = md5_ii(a, b, c, d, x[i + 0], 6, -198630844);
+          d = md5_ii(d, a, b, c, x[i + 7], 10, 1126891415);
+          c = md5_ii(c, d, a, b, x[i + 14], 15, -1416354905);
+          b = md5_ii(b, c, d, a, x[i + 5], 21, -57434055);
+          a = md5_ii(a, b, c, d, x[i + 12], 6, 1700485571);
+          d = md5_ii(d, a, b, c, x[i + 3], 10, -1894986606);
+          c = md5_ii(c, d, a, b, x[i + 10], 15, -1051523);
+          b = md5_ii(b, c, d, a, x[i + 1], 21, -2054922799);
+          a = md5_ii(a, b, c, d, x[i + 8], 6, 1873313359);
+          d = md5_ii(d, a, b, c, x[i + 15], 10, -30611744);
+          c = md5_ii(c, d, a, b, x[i + 6], 15, -1560198380);
+          b = md5_ii(b, c, d, a, x[i + 13], 21, 1309151649);
+          a = md5_ii(a, b, c, d, x[i + 4], 6, -145523070);
+          d = md5_ii(d, a, b, c, x[i + 11], 10, -1120210379);
+          c = md5_ii(c, d, a, b, x[i + 2], 15, 718787259);
+          b = md5_ii(b, c, d, a, x[i + 9], 21, -343485551);
+
+          a = safe_add(a, olda);
+          b = safe_add(b, oldb);
+          c = safe_add(c, oldc);
+          d = safe_add(d, oldd);
+        }
+        return Array(a, b, c, d);
+      }
+
+      /**
+       * These functions implement the four basic operations the algorithm uses.
+       */
+
+      function md5_cmn(q, a, b, x, s, t) {
+        return safe_add(bit_rol(safe_add(safe_add(a, q), safe_add(x, t)), s), b);
+      }
+
+      function md5_ff(a, b, c, d, x, s, t) {
+        return md5_cmn((b & c) | ((~b) & d), a, b, x, s, t);
+      }
+
+      function md5_gg(a, b, c, d, x, s, t) {
+        return md5_cmn((b & d) | (c & (~d)), a, b, x, s, t);
+      }
+
+      function md5_hh(a, b, c, d, x, s, t) {
+        return md5_cmn(b ^ c ^ d, a, b, x, s, t);
+      }
+
+      function md5_ii(a, b, c, d, x, s, t) {
+        return md5_cmn(c ^ (b | (~d)), a, b, x, s, t);
+      }
+    },
+    /**
+     * @member Hashes
+     * @class Hashes.SHA1
+     * @param {Object} [config]
+     * @constructor
+     *
+     * A JavaScript implementation of the Secure Hash Algorithm, SHA-1, as defined in FIPS 180-1
+     * Version 2.2 Copyright Paul Johnston 2000 - 2009.
+     * Other contributors: Greg Holt, Andrew Kepert, Ydnar, Lostinet
+     * See http://pajhome.org.uk/crypt/md5 for details.
+     */
+    SHA1: function(options) {
+      /**
+       * Private config properties. You may need to tweak these to be compatible with
+       * the server-side, but the defaults work in most cases.
+       * See {@link Hashes.MD5#method-setUpperCase} and {@link Hashes.SHA1#method-setUpperCase}
+       */
+      var hexcase = (options && typeof options.uppercase === 'boolean') ? options.uppercase : false, // hexadecimal output case format. false - lowercase; true - uppercase
+        b64pad = (options && typeof options.pad === 'string') ? options.pda : '=', // base-64 pad character. Defaults to '=' for strict RFC compliance
+        utf8 = (options && typeof options.utf8 === 'boolean') ? options.utf8 : true; // enable/disable utf8 encoding
+
+      // public methods
+      this.hex = function(s) {
+        return rstr2hex(rstr(s, utf8), hexcase);
+      };
+      this.b64 = function(s) {
+        return rstr2b64(rstr(s, utf8), b64pad);
+      };
+      this.any = function(s, e) {
+        return rstr2any(rstr(s, utf8), e);
+      };
+      this.raw = function(s) {
+        return rstr(s, utf8);
+      };
+      this.hex_hmac = function(k, d) {
+        return rstr2hex(rstr_hmac(k, d));
+      };
+      this.b64_hmac = function(k, d) {
+        return rstr2b64(rstr_hmac(k, d), b64pad);
+      };
+      this.any_hmac = function(k, d, e) {
+        return rstr2any(rstr_hmac(k, d), e);
+      };
+      /**
+       * Perform a simple self-test to see if the VM is working
+       * @return {String} Hexadecimal hash sample
+       * @public
+       */
+      this.vm_test = function() {
+        return hex('abc').toLowerCase() === '900150983cd24fb0d6963f7d28e17f72';
+      };
+      /**
+       * @description Enable/disable uppercase hexadecimal returned string
+       * @param {boolean}
+       * @return {Object} this
+       * @public
+       */
+      this.setUpperCase = function(a) {
+        if (typeof a === 'boolean') {
+          hexcase = a;
+        }
+        return this;
+      };
+      /**
+       * @description Defines a base64 pad string
+       * @param {string} Pad
+       * @return {Object} this
+       * @public
+       */
+      this.setPad = function(a) {
+        b64pad = a || b64pad;
+        return this;
+      };
+      /**
+       * @description Defines a base64 pad string
+       * @param {boolean}
+       * @return {Object} this
+       * @public
+       */
+      this.setUTF8 = function(a) {
+        if (typeof a === 'boolean') {
+          utf8 = a;
+        }
+        return this;
+      };
+
+      // private methods
+
+      /**
+       * Calculate the SHA-512 of a raw string
+       */
+
+      function rstr(s) {
+        s = (utf8) ? utf8Encode(s) : s;
+        return binb2rstr(binb(rstr2binb(s), s.length * 8));
+      }
+
+      /**
+       * Calculate the HMAC-SHA1 of a key and some data (raw strings)
+       */
+
+      function rstr_hmac(key, data) {
+        var bkey, ipad, opad, i, hash;
+        key = (utf8) ? utf8Encode(key) : key;
+        data = (utf8) ? utf8Encode(data) : data;
+        bkey = rstr2binb(key);
+
+        if (bkey.length > 16) {
+          bkey = binb(bkey, key.length * 8);
+        }
+        ipad = Array(16), opad = Array(16);
+        for (i = 0; i < 16; i += 1) {
+          ipad[i] = bkey[i] ^ 0x36363636;
+          opad[i] = bkey[i] ^ 0x5C5C5C5C;
+        }
+        hash = binb(ipad.concat(rstr2binb(data)), 512 + data.length * 8);
+        return binb2rstr(binb(opad.concat(hash), 512 + 160));
+      }
+
+      /**
+       * Calculate the SHA-1 of an array of big-endian words, and a bit length
+       */
+
+      function binb(x, len) {
+        var i, j, t, olda, oldb, oldc, oldd, olde,
+          w = Array(80),
+          a = 1732584193,
+          b = -271733879,
+          c = -1732584194,
+          d = 271733878,
+          e = -1009589776;
+
+        /* append padding */
+        x[len >> 5] |= 0x80 << (24 - len % 32);
+        x[((len + 64 >> 9) << 4) + 15] = len;
+
+        for (i = 0; i < x.length; i += 16) {
+          olda = a,
+          oldb = b;
+          oldc = c;
+          oldd = d;
+          olde = e;
+
+          for (j = 0; j < 80; j += 1) {
+            if (j < 16) {
+              w[j] = x[i + j];
+            } else {
+              w[j] = bit_rol(w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16], 1);
+            }
+            t = safe_add(safe_add(bit_rol(a, 5), sha1_ft(j, b, c, d)),
+              safe_add(safe_add(e, w[j]), sha1_kt(j)));
+            e = d;
+            d = c;
+            c = bit_rol(b, 30);
+            b = a;
+            a = t;
+          }
+
+          a = safe_add(a, olda);
+          b = safe_add(b, oldb);
+          c = safe_add(c, oldc);
+          d = safe_add(d, oldd);
+          e = safe_add(e, olde);
+        }
+        return Array(a, b, c, d, e);
+      }
+
+      /**
+       * Perform the appropriate triplet combination function for the current
+       * iteration
+       */
+
+      function sha1_ft(t, b, c, d) {
+        if (t < 20) {
+          return (b & c) | ((~b) & d);
+        }
+        if (t < 40) {
+          return b ^ c ^ d;
+        }
+        if (t < 60) {
+          return (b & c) | (b & d) | (c & d);
+        }
+        return b ^ c ^ d;
+      }
+
+      /**
+       * Determine the appropriate additive constant for the current iteration
+       */
+
+      function sha1_kt(t) {
+        return (t < 20) ? 1518500249 : (t < 40) ? 1859775393 :
+          (t < 60) ? -1894007588 : -899497514;
+      }
+    },
+    /**
+     * @class Hashes.SHA256
+     * @param {config}
+     *
+     * A JavaScript implementation of the Secure Hash Algorithm, SHA-256, as defined in FIPS 180-2
+     * Version 2.2 Copyright Angel Marin, Paul Johnston 2000 - 2009.
+     * Other contributors: Greg Holt, Andrew Kepert, Ydnar, Lostinet
+     * See http://pajhome.org.uk/crypt/md5 for details.
+     * Also http://anmar.eu.org/projects/jssha2/
+     */
+    SHA256: function(options) {
+      /**
+       * Private properties configuration variables. You may need to tweak these to be compatible with
+       * the server-side, but the defaults work in most cases.
+       * @see this.setUpperCase() method
+       * @see this.setPad() method
+       */
+      var hexcase = (options && typeof options.uppercase === 'boolean') ? options.uppercase : false, // hexadecimal output case format. false - lowercase; true - uppercase  */
+        b64pad = (options && typeof options.pad === 'string') ? options.pda : '=',
+        /* base-64 pad character. Default '=' for strict RFC compliance   */
+        utf8 = (options && typeof options.utf8 === 'boolean') ? options.utf8 : true,
+        /* enable/disable utf8 encoding */
+        sha256_K;
+
+      /* privileged (public) methods */
+      this.hex = function(s) {
+        return rstr2hex(rstr(s, utf8));
+      };
+      this.b64 = function(s) {
+        return rstr2b64(rstr(s, utf8), b64pad);
+      };
+      this.any = function(s, e) {
+        return rstr2any(rstr(s, utf8), e);
+      };
+      this.raw = function(s) {
+        return rstr(s, utf8);
+      };
+      this.hex_hmac = function(k, d) {
+        return rstr2hex(rstr_hmac(k, d));
+      };
+      this.b64_hmac = function(k, d) {
+        return rstr2b64(rstr_hmac(k, d), b64pad);
+      };
+      this.any_hmac = function(k, d, e) {
+        return rstr2any(rstr_hmac(k, d), e);
+      };
+      /**
+       * Perform a simple self-test to see if the VM is working
+       * @return {String} Hexadecimal hash sample
+       * @public
+       */
+      this.vm_test = function() {
+        return hex('abc').toLowerCase() === '900150983cd24fb0d6963f7d28e17f72';
+      };
+      /**
+       * Enable/disable uppercase hexadecimal returned string
+       * @param {boolean}
+       * @return {Object} this
+       * @public
+       */
+      this.setUpperCase = function(a) {
+        if (typeof a === 'boolean') {
+          hexcase = a;
+        }
+        return this;
+      };
+      /**
+       * @description Defines a base64 pad string
+       * @param {string} Pad
+       * @return {Object} this
+       * @public
+       */
+      this.setPad = function(a) {
+        b64pad = a || b64pad;
+        return this;
+      };
+      /**
+       * Defines a base64 pad string
+       * @param {boolean}
+       * @return {Object} this
+       * @public
+       */
+      this.setUTF8 = function(a) {
+        if (typeof a === 'boolean') {
+          utf8 = a;
+        }
+        return this;
+      };
+
+      // private methods
+
+      /**
+       * Calculate the SHA-512 of a raw string
+       */
+
+      function rstr(s, utf8) {
+        s = (utf8) ? utf8Encode(s) : s;
+        return binb2rstr(binb(rstr2binb(s), s.length * 8));
+      }
+
+      /**
+       * Calculate the HMAC-sha256 of a key and some data (raw strings)
+       */
+
+      function rstr_hmac(key, data) {
+        key = (utf8) ? utf8Encode(key) : key;
+        data = (utf8) ? utf8Encode(data) : data;
+        var hash, i = 0,
+          bkey = rstr2binb(key),
+          ipad = Array(16),
+          opad = Array(16);
+
+        if (bkey.length > 16) {
+          bkey = binb(bkey, key.length * 8);
+        }
+
+        for (; i < 16; i += 1) {
+          ipad[i] = bkey[i] ^ 0x36363636;
+          opad[i] = bkey[i] ^ 0x5C5C5C5C;
+        }
+
+        hash = binb(ipad.concat(rstr2binb(data)), 512 + data.length * 8);
+        return binb2rstr(binb(opad.concat(hash), 512 + 256));
+      }
+
+      /*
+       * Main sha256 function, with its support functions
+       */
+
+      function sha256_S(X, n) {
+        return (X >>> n) | (X << (32 - n));
+      }
+
+      function sha256_R(X, n) {
+        return (X >>> n);
+      }
+
+      function sha256_Ch(x, y, z) {
+        return ((x & y) ^ ((~x) & z));
+      }
+
+      function sha256_Maj(x, y, z) {
+        return ((x & y) ^ (x & z) ^ (y & z));
+      }
+
+      function sha256_Sigma0256(x) {
+        return (sha256_S(x, 2) ^ sha256_S(x, 13) ^ sha256_S(x, 22));
+      }
+
+      function sha256_Sigma1256(x) {
+        return (sha256_S(x, 6) ^ sha256_S(x, 11) ^ sha256_S(x, 25));
+      }
+
+      function sha256_Gamma0256(x) {
+        return (sha256_S(x, 7) ^ sha256_S(x, 18) ^ sha256_R(x, 3));
+      }
+
+      function sha256_Gamma1256(x) {
+        return (sha256_S(x, 17) ^ sha256_S(x, 19) ^ sha256_R(x, 10));
+      }
+
+      function sha256_Sigma0512(x) {
+        return (sha256_S(x, 28) ^ sha256_S(x, 34) ^ sha256_S(x, 39));
+      }
+
+      function sha256_Sigma1512(x) {
+        return (sha256_S(x, 14) ^ sha256_S(x, 18) ^ sha256_S(x, 41));
+      }
+
+      function sha256_Gamma0512(x) {
+        return (sha256_S(x, 1) ^ sha256_S(x, 8) ^ sha256_R(x, 7));
+      }
+
+      function sha256_Gamma1512(x) {
+        return (sha256_S(x, 19) ^ sha256_S(x, 61) ^ sha256_R(x, 6));
+      }
+
+      sha256_K = [
+        1116352408, 1899447441, -1245643825, -373957723, 961987163, 1508970993, -1841331548, -1424204075, -670586216, 310598401, 607225278, 1426881987,
+        1925078388, -2132889090, -1680079193, -1046744716, -459576895, -272742522,
+        264347078, 604807628, 770255983, 1249150122, 1555081692, 1996064986, -1740746414, -1473132947, -1341970488, -1084653625, -958395405, -710438585,
+        113926993, 338241895, 666307205, 773529912, 1294757372, 1396182291,
+        1695183700, 1986661051, -2117940946, -1838011259, -1564481375, -1474664885, -1035236496, -949202525, -778901479, -694614492, -200395387, 275423344,
+        430227734, 506948616, 659060556, 883997877, 958139571, 1322822218,
+        1537002063, 1747873779, 1955562222, 2024104815, -2067236844, -1933114872, -1866530822, -1538233109, -1090935817, -965641998
+      ];
+
+      function binb(m, l) {
+        var HASH = [1779033703, -1150833019, 1013904242, -1521486534,
+          1359893119, -1694144372, 528734635, 1541459225
+        ];
+        var W = new Array(64);
+        var a, b, c, d, e, f, g, h;
+        var i, j, T1, T2;
+
+        /* append padding */
+        m[l >> 5] |= 0x80 << (24 - l % 32);
+        m[((l + 64 >> 9) << 4) + 15] = l;
+
+        for (i = 0; i < m.length; i += 16) {
+          a = HASH[0];
+          b = HASH[1];
+          c = HASH[2];
+          d = HASH[3];
+          e = HASH[4];
+          f = HASH[5];
+          g = HASH[6];
+          h = HASH[7];
+
+          for (j = 0; j < 64; j += 1) {
+            if (j < 16) {
+              W[j] = m[j + i];
+            } else {
+              W[j] = safe_add(safe_add(safe_add(sha256_Gamma1256(W[j - 2]), W[j - 7]),
+                sha256_Gamma0256(W[j - 15])), W[j - 16]);
+            }
+
+            T1 = safe_add(safe_add(safe_add(safe_add(h, sha256_Sigma1256(e)), sha256_Ch(e, f, g)),
+              sha256_K[j]), W[j]);
+            T2 = safe_add(sha256_Sigma0256(a), sha256_Maj(a, b, c));
+            h = g;
+            g = f;
+            f = e;
+            e = safe_add(d, T1);
+            d = c;
+            c = b;
+            b = a;
+            a = safe_add(T1, T2);
+          }
+
+          HASH[0] = safe_add(a, HASH[0]);
+          HASH[1] = safe_add(b, HASH[1]);
+          HASH[2] = safe_add(c, HASH[2]);
+          HASH[3] = safe_add(d, HASH[3]);
+          HASH[4] = safe_add(e, HASH[4]);
+          HASH[5] = safe_add(f, HASH[5]);
+          HASH[6] = safe_add(g, HASH[6]);
+          HASH[7] = safe_add(h, HASH[7]);
+        }
+        return HASH;
+      }
+
+    },
+
+    /**
+     * @class Hashes.SHA512
+     * @param {config}
+     *
+     * A JavaScript implementation of the Secure Hash Algorithm, SHA-512, as defined in FIPS 180-2
+     * Version 2.2 Copyright Anonymous Contributor, Paul Johnston 2000 - 2009.
+     * Other contributors: Greg Holt, Andrew Kepert, Ydnar, Lostinet
+     * See http://pajhome.org.uk/crypt/md5 for details.
+     */
+    SHA512: function(options) {
+      /**
+       * Private properties configuration variables. You may need to tweak these to be compatible with
+       * the server-side, but the defaults work in most cases.
+       * @see this.setUpperCase() method
+       * @see this.setPad() method
+       */
+      var hexcase = (options && typeof options.uppercase === 'boolean') ? options.uppercase : false,
+        /* hexadecimal output case format. false - lowercase; true - uppercase  */
+        b64pad = (options && typeof options.pad === 'string') ? options.pda : '=',
+        /* base-64 pad character. Default '=' for strict RFC compliance   */
+        utf8 = (options && typeof options.utf8 === 'boolean') ? options.utf8 : true,
+        /* enable/disable utf8 encoding */
+        sha512_k;
+
+      /* privileged (public) methods */
+      this.hex = function(s) {
+        return rstr2hex(rstr(s));
+      };
+      this.b64 = function(s) {
+        return rstr2b64(rstr(s), b64pad);
+      };
+      this.any = function(s, e) {
+        return rstr2any(rstr(s), e);
+      };
+      this.raw = function(s) {
+        return rstr(s, utf8);
+      };
+      this.hex_hmac = function(k, d) {
+        return rstr2hex(rstr_hmac(k, d));
+      };
+      this.b64_hmac = function(k, d) {
+        return rstr2b64(rstr_hmac(k, d), b64pad);
+      };
+      this.any_hmac = function(k, d, e) {
+        return rstr2any(rstr_hmac(k, d), e);
+      };
+      /**
+       * Perform a simple self-test to see if the VM is working
+       * @return {String} Hexadecimal hash sample
+       * @public
+       */
+      this.vm_test = function() {
+        return hex('abc').toLowerCase() === '900150983cd24fb0d6963f7d28e17f72';
+      };
+      /**
+       * @description Enable/disable uppercase hexadecimal returned string
+       * @param {boolean}
+       * @return {Object} this
+       * @public
+       */
+      this.setUpperCase = function(a) {
+        if (typeof a === 'boolean') {
+          hexcase = a;
+        }
+        return this;
+      };
+      /**
+       * @description Defines a base64 pad string
+       * @param {string} Pad
+       * @return {Object} this
+       * @public
+       */
+      this.setPad = function(a) {
+        b64pad = a || b64pad;
+        return this;
+      };
+      /**
+       * @description Defines a base64 pad string
+       * @param {boolean}
+       * @return {Object} this
+       * @public
+       */
+      this.setUTF8 = function(a) {
+        if (typeof a === 'boolean') {
+          utf8 = a;
+        }
+        return this;
+      };
+
+      /* private methods */
+
+      /**
+       * Calculate the SHA-512 of a raw string
+       */
+
+      function rstr(s) {
+        s = (utf8) ? utf8Encode(s) : s;
+        return binb2rstr(binb(rstr2binb(s), s.length * 8));
+      }
+      /*
+       * Calculate the HMAC-SHA-512 of a key and some data (raw strings)
+       */
+
+      function rstr_hmac(key, data) {
+        key = (utf8) ? utf8Encode(key) : key;
+        data = (utf8) ? utf8Encode(data) : data;
+
+        var hash, i = 0,
+          bkey = rstr2binb(key),
+          ipad = Array(32),
+          opad = Array(32);
+
+        if (bkey.length > 32) {
+          bkey = binb(bkey, key.length * 8);
+        }
+
+        for (; i < 32; i += 1) {
+          ipad[i] = bkey[i] ^ 0x36363636;
+          opad[i] = bkey[i] ^ 0x5C5C5C5C;
+        }
+
+        hash = binb(ipad.concat(rstr2binb(data)), 1024 + data.length * 8);
+        return binb2rstr(binb(opad.concat(hash), 1024 + 512));
+      }
+
+      /**
+       * Calculate the SHA-512 of an array of big-endian dwords, and a bit length
+       */
+
+      function binb(x, len) {
+        var j, i, l,
+          W = new Array(80),
+          hash = new Array(16),
+          //Initial hash values
+          H = [
+            new int64(0x6a09e667, -205731576),
+            new int64(-1150833019, -2067093701),
+            new int64(0x3c6ef372, -23791573),
+            new int64(-1521486534, 0x5f1d36f1),
+            new int64(0x510e527f, -1377402159),
+            new int64(-1694144372, 0x2b3e6c1f),
+            new int64(0x1f83d9ab, -79577749),
+            new int64(0x5be0cd19, 0x137e2179)
+          ],
+          T1 = new int64(0, 0),
+          T2 = new int64(0, 0),
+          a = new int64(0, 0),
+          b = new int64(0, 0),
+          c = new int64(0, 0),
+          d = new int64(0, 0),
+          e = new int64(0, 0),
+          f = new int64(0, 0),
+          g = new int64(0, 0),
+          h = new int64(0, 0),
+          //Temporary variables not specified by the document
+          s0 = new int64(0, 0),
+          s1 = new int64(0, 0),
+          Ch = new int64(0, 0),
+          Maj = new int64(0, 0),
+          r1 = new int64(0, 0),
+          r2 = new int64(0, 0),
+          r3 = new int64(0, 0);
+
+        if (sha512_k === undefined) {
+          //SHA512 constants
+          sha512_k = [
+            new int64(0x428a2f98, -685199838), new int64(0x71374491, 0x23ef65cd),
+            new int64(-1245643825, -330482897), new int64(-373957723, -2121671748),
+            new int64(0x3956c25b, -213338824), new int64(0x59f111f1, -1241133031),
+            new int64(-1841331548, -1357295717), new int64(-1424204075, -630357736),
+            new int64(-670586216, -1560083902), new int64(0x12835b01, 0x45706fbe),
+            new int64(0x243185be, 0x4ee4b28c), new int64(0x550c7dc3, -704662302),
+            new int64(0x72be5d74, -226784913), new int64(-2132889090, 0x3b1696b1),
+            new int64(-1680079193, 0x25c71235), new int64(-1046744716, -815192428),
+            new int64(-459576895, -1628353838), new int64(-272742522, 0x384f25e3),
+            new int64(0xfc19dc6, -1953704523), new int64(0x240ca1cc, 0x77ac9c65),
+            new int64(0x2de92c6f, 0x592b0275), new int64(0x4a7484aa, 0x6ea6e483),
+            new int64(0x5cb0a9dc, -1119749164), new int64(0x76f988da, -2096016459),
+            new int64(-1740746414, -295247957), new int64(-1473132947, 0x2db43210),
+            new int64(-1341970488, -1728372417), new int64(-1084653625, -1091629340),
+            new int64(-958395405, 0x3da88fc2), new int64(-710438585, -1828018395),
+            new int64(0x6ca6351, -536640913), new int64(0x14292967, 0xa0e6e70),
+            new int64(0x27b70a85, 0x46d22ffc), new int64(0x2e1b2138, 0x5c26c926),
+            new int64(0x4d2c6dfc, 0x5ac42aed), new int64(0x53380d13, -1651133473),
+            new int64(0x650a7354, -1951439906), new int64(0x766a0abb, 0x3c77b2a8),
+            new int64(-2117940946, 0x47edaee6), new int64(-1838011259, 0x1482353b),
+            new int64(-1564481375, 0x4cf10364), new int64(-1474664885, -1136513023),
+            new int64(-1035236496, -789014639), new int64(-949202525, 0x654be30),
+            new int64(-778901479, -688958952), new int64(-694614492, 0x5565a910),
+            new int64(-200395387, 0x5771202a), new int64(0x106aa070, 0x32bbd1b8),
+            new int64(0x19a4c116, -1194143544), new int64(0x1e376c08, 0x5141ab53),
+            new int64(0x2748774c, -544281703), new int64(0x34b0bcb5, -509917016),
+            new int64(0x391c0cb3, -976659869), new int64(0x4ed8aa4a, -482243893),
+            new int64(0x5b9cca4f, 0x7763e373), new int64(0x682e6ff3, -692930397),
+            new int64(0x748f82ee, 0x5defb2fc), new int64(0x78a5636f, 0x43172f60),
+            new int64(-2067236844, -1578062990), new int64(-1933114872, 0x1a6439ec),
+            new int64(-1866530822, 0x23631e28), new int64(-1538233109, -561857047),
+            new int64(-1090935817, -1295615723), new int64(-965641998, -479046869),
+            new int64(-903397682, -366583396), new int64(-779700025, 0x21c0c207),
+            new int64(-354779690, -840897762), new int64(-176337025, -294727304),
+            new int64(0x6f067aa, 0x72176fba), new int64(0xa637dc5, -1563912026),
+            new int64(0x113f9804, -1090974290), new int64(0x1b710b35, 0x131c471b),
+            new int64(0x28db77f5, 0x23047d84), new int64(0x32caab7b, 0x40c72493),
+            new int64(0x3c9ebe0a, 0x15c9bebc), new int64(0x431d67c4, -1676669620),
+            new int64(0x4cc5d4be, -885112138), new int64(0x597f299c, -60457430),
+            new int64(0x5fcb6fab, 0x3ad6faec), new int64(0x6c44198c, 0x4a475817)
+          ];
+        }
+
+        for (i = 0; i < 80; i += 1) {
+          W[i] = new int64(0, 0);
+        }
+
+        // append padding to the source string. The format is described in the FIPS.
+        x[len >> 5] |= 0x80 << (24 - (len & 0x1f));
+        x[((len + 128 >> 10) << 5) + 31] = len;
+        l = x.length;
+        for (i = 0; i < l; i += 32) { //32 dwords is the block size
+          int64copy(a, H[0]);
+          int64copy(b, H[1]);
+          int64copy(c, H[2]);
+          int64copy(d, H[3]);
+          int64copy(e, H[4]);
+          int64copy(f, H[5]);
+          int64copy(g, H[6]);
+          int64copy(h, H[7]);
+
+          for (j = 0; j < 16; j += 1) {
+            W[j].h = x[i + 2 * j];
+            W[j].l = x[i + 2 * j + 1];
+          }
+
+          for (j = 16; j < 80; j += 1) {
+            //sigma1
+            int64rrot(r1, W[j - 2], 19);
+            int64revrrot(r2, W[j - 2], 29);
+            int64shr(r3, W[j - 2], 6);
+            s1.l = r1.l ^ r2.l ^ r3.l;
+            s1.h = r1.h ^ r2.h ^ r3.h;
+            //sigma0
+            int64rrot(r1, W[j - 15], 1);
+            int64rrot(r2, W[j - 15], 8);
+            int64shr(r3, W[j - 15], 7);
+            s0.l = r1.l ^ r2.l ^ r3.l;
+            s0.h = r1.h ^ r2.h ^ r3.h;
+
+            int64add4(W[j], s1, W[j - 7], s0, W[j - 16]);
+          }
+
+          for (j = 0; j < 80; j += 1) {
+            //Ch
+            Ch.l = (e.l & f.l) ^ (~e.l & g.l);
+            Ch.h = (e.h & f.h) ^ (~e.h & g.h);
+
+            //Sigma1
+            int64rrot(r1, e, 14);
+            int64rrot(r2, e, 18);
+            int64revrrot(r3, e, 9);
+            s1.l = r1.l ^ r2.l ^ r3.l;
+            s1.h = r1.h ^ r2.h ^ r3.h;
+
+            //Sigma0
+            int64rrot(r1, a, 28);
+            int64revrrot(r2, a, 2);
+            int64revrrot(r3, a, 7);
+            s0.l = r1.l ^ r2.l ^ r3.l;
+            s0.h = r1.h ^ r2.h ^ r3.h;
+
+            //Maj
+            Maj.l = (a.l & b.l) ^ (a.l & c.l) ^ (b.l & c.l);
+            Maj.h = (a.h & b.h) ^ (a.h & c.h) ^ (b.h & c.h);
+
+            int64add5(T1, h, s1, Ch, sha512_k[j], W[j]);
+            int64add(T2, s0, Maj);
+
+            int64copy(h, g);
+            int64copy(g, f);
+            int64copy(f, e);
+            int64add(e, d, T1);
+            int64copy(d, c);
+            int64copy(c, b);
+            int64copy(b, a);
+            int64add(a, T1, T2);
+          }
+          int64add(H[0], H[0], a);
+          int64add(H[1], H[1], b);
+          int64add(H[2], H[2], c);
+          int64add(H[3], H[3], d);
+          int64add(H[4], H[4], e);
+          int64add(H[5], H[5], f);
+          int64add(H[6], H[6], g);
+          int64add(H[7], H[7], h);
+        }
+
+        //represent the hash as an array of 32-bit dwords
+        for (i = 0; i < 8; i += 1) {
+          hash[2 * i] = H[i].h;
+          hash[2 * i + 1] = H[i].l;
+        }
+        return hash;
+      }
+
+      //A constructor for 64-bit numbers
+
+      function int64(h, l) {
+        this.h = h;
+        this.l = l;
+        //this.toString = int64toString;
+      }
+
+      //Copies src into dst, assuming both are 64-bit numbers
+
+      function int64copy(dst, src) {
+        dst.h = src.h;
+        dst.l = src.l;
+      }
+
+      //Right-rotates a 64-bit number by shift
+      //Won't handle cases of shift>=32
+      //The function revrrot() is for that
+
+      function int64rrot(dst, x, shift) {
+        dst.l = (x.l >>> shift) | (x.h << (32 - shift));
+        dst.h = (x.h >>> shift) | (x.l << (32 - shift));
+      }
+
+      //Reverses the dwords of the source and then rotates right by shift.
+      //This is equivalent to rotation by 32+shift
+
+      function int64revrrot(dst, x, shift) {
+        dst.l = (x.h >>> shift) | (x.l << (32 - shift));
+        dst.h = (x.l >>> shift) | (x.h << (32 - shift));
+      }
+
+      //Bitwise-shifts right a 64-bit number by shift
+      //Won't handle shift>=32, but it's never needed in SHA512
+
+      function int64shr(dst, x, shift) {
+        dst.l = (x.l >>> shift) | (x.h << (32 - shift));
+        dst.h = (x.h >>> shift);
+      }
+
+      //Adds two 64-bit numbers
+      //Like the original implementation, does not rely on 32-bit operations
+
+      function int64add(dst, x, y) {
+        var w0 = (x.l & 0xffff) + (y.l & 0xffff);
+        var w1 = (x.l >>> 16) + (y.l >>> 16) + (w0 >>> 16);
+        var w2 = (x.h & 0xffff) + (y.h & 0xffff) + (w1 >>> 16);
+        var w3 = (x.h >>> 16) + (y.h >>> 16) + (w2 >>> 16);
+        dst.l = (w0 & 0xffff) | (w1 << 16);
+        dst.h = (w2 & 0xffff) | (w3 << 16);
+      }
+
+      //Same, except with 4 addends. Works faster than adding them one by one.
+
+      function int64add4(dst, a, b, c, d) {
+        var w0 = (a.l & 0xffff) + (b.l & 0xffff) + (c.l & 0xffff) + (d.l & 0xffff);
+        var w1 = (a.l >>> 16) + (b.l >>> 16) + (c.l >>> 16) + (d.l >>> 16) + (w0 >>> 16);
+        var w2 = (a.h & 0xffff) + (b.h & 0xffff) + (c.h & 0xffff) + (d.h & 0xffff) + (w1 >>> 16);
+        var w3 = (a.h >>> 16) + (b.h >>> 16) + (c.h >>> 16) + (d.h >>> 16) + (w2 >>> 16);
+        dst.l = (w0 & 0xffff) | (w1 << 16);
+        dst.h = (w2 & 0xffff) | (w3 << 16);
+      }
+
+      //Same, except with 5 addends
+
+      function int64add5(dst, a, b, c, d, e) {
+        var w0 = (a.l & 0xffff) + (b.l & 0xffff) + (c.l & 0xffff) + (d.l & 0xffff) + (e.l & 0xffff),
+          w1 = (a.l >>> 16) + (b.l >>> 16) + (c.l >>> 16) + (d.l >>> 16) + (e.l >>> 16) + (w0 >>> 16),
+          w2 = (a.h & 0xffff) + (b.h & 0xffff) + (c.h & 0xffff) + (d.h & 0xffff) + (e.h & 0xffff) + (w1 >>> 16),
+          w3 = (a.h >>> 16) + (b.h >>> 16) + (c.h >>> 16) + (d.h >>> 16) + (e.h >>> 16) + (w2 >>> 16);
+        dst.l = (w0 & 0xffff) | (w1 << 16);
+        dst.h = (w2 & 0xffff) | (w3 << 16);
+      }
+    },
+    /**
+     * @class Hashes.RMD160
+     * @constructor
+     * @param {Object} [config]
+     *
+     * A JavaScript implementation of the RIPEMD-160 Algorithm
+     * Version 2.2 Copyright Jeremy Lin, Paul Johnston 2000 - 2009.
+     * Other contributors: Greg Holt, Andrew Kepert, Ydnar, Lostinet
+     * See http://pajhome.org.uk/crypt/md5 for details.
+     * Also http://www.ocf.berkeley.edu/~jjlin/jsotp/
+     */
+    RMD160: function(options) {
+      /**
+       * Private properties configuration variables. You may need to tweak these to be compatible with
+       * the server-side, but the defaults work in most cases.
+       * @see this.setUpperCase() method
+       * @see this.setPad() method
+       */
+      var hexcase = (options && typeof options.uppercase === 'boolean') ? options.uppercase : false,
+        /* hexadecimal output case format. false - lowercase; true - uppercase  */
+        b64pad = (options && typeof options.pad === 'string') ? options.pda : '=',
+        /* base-64 pad character. Default '=' for strict RFC compliance   */
+        utf8 = (options && typeof options.utf8 === 'boolean') ? options.utf8 : true,
+        /* enable/disable utf8 encoding */
+        rmd160_r1 = [
+          0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+          7, 4, 13, 1, 10, 6, 15, 3, 12, 0, 9, 5, 2, 14, 11, 8,
+          3, 10, 14, 4, 9, 15, 8, 1, 2, 7, 0, 6, 13, 11, 5, 12,
+          1, 9, 11, 10, 0, 8, 12, 4, 13, 3, 7, 15, 14, 5, 6, 2,
+          4, 0, 5, 9, 7, 12, 2, 10, 14, 1, 3, 8, 11, 6, 15, 13
+        ],
+        rmd160_r2 = [
+          5, 14, 7, 0, 9, 2, 11, 4, 13, 6, 15, 8, 1, 10, 3, 12,
+          6, 11, 3, 7, 0, 13, 5, 10, 14, 15, 8, 12, 4, 9, 1, 2,
+          15, 5, 1, 3, 7, 14, 6, 9, 11, 8, 12, 2, 10, 0, 4, 13,
+          8, 6, 4, 1, 3, 11, 15, 0, 5, 12, 2, 13, 9, 7, 10, 14,
+          12, 15, 10, 4, 1, 5, 8, 7, 6, 2, 13, 14, 0, 3, 9, 11
+        ],
+        rmd160_s1 = [
+          11, 14, 15, 12, 5, 8, 7, 9, 11, 13, 14, 15, 6, 7, 9, 8,
+          7, 6, 8, 13, 11, 9, 7, 15, 7, 12, 15, 9, 11, 7, 13, 12,
+          11, 13, 6, 7, 14, 9, 13, 15, 14, 8, 13, 6, 5, 12, 7, 5,
+          11, 12, 14, 15, 14, 15, 9, 8, 9, 14, 5, 6, 8, 6, 5, 12,
+          9, 15, 5, 11, 6, 8, 13, 12, 5, 12, 13, 14, 11, 8, 5, 6
+        ],
+        rmd160_s2 = [
+          8, 9, 9, 11, 13, 15, 15, 5, 7, 7, 8, 11, 14, 14, 12, 6,
+          9, 13, 15, 7, 12, 8, 9, 11, 7, 7, 12, 7, 6, 15, 13, 11,
+          9, 7, 15, 11, 8, 6, 6, 14, 12, 13, 5, 14, 13, 13, 7, 5,
+          15, 5, 8, 11, 14, 14, 6, 14, 6, 9, 12, 9, 12, 5, 15, 8,
+          8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11
+        ];
+
+      /* privileged (public) methods */
+      this.hex = function(s) {
+        return rstr2hex(rstr(s, utf8));
+      };
+      this.b64 = function(s) {
+        return rstr2b64(rstr(s, utf8), b64pad);
+      };
+      this.any = function(s, e) {
+        return rstr2any(rstr(s, utf8), e);
+      };
+      this.raw = function(s) {
+        return rstr(s, utf8);
+      };
+      this.hex_hmac = function(k, d) {
+        return rstr2hex(rstr_hmac(k, d));
+      };
+      this.b64_hmac = function(k, d) {
+        return rstr2b64(rstr_hmac(k, d), b64pad);
+      };
+      this.any_hmac = function(k, d, e) {
+        return rstr2any(rstr_hmac(k, d), e);
+      };
+      /**
+       * Perform a simple self-test to see if the VM is working
+       * @return {String} Hexadecimal hash sample
+       * @public
+       */
+      this.vm_test = function() {
+        return hex('abc').toLowerCase() === '900150983cd24fb0d6963f7d28e17f72';
+      };
+      /**
+       * @description Enable/disable uppercase hexadecimal returned string
+       * @param {boolean}
+       * @return {Object} this
+       * @public
+       */
+      this.setUpperCase = function(a) {
+        if (typeof a === 'boolean') {
+          hexcase = a;
+        }
+        return this;
+      };
+      /**
+       * @description Defines a base64 pad string
+       * @param {string} Pad
+       * @return {Object} this
+       * @public
+       */
+      this.setPad = function(a) {
+        if (typeof a !== 'undefined') {
+          b64pad = a;
+        }
+        return this;
+      };
+      /**
+       * @description Defines a base64 pad string
+       * @param {boolean}
+       * @return {Object} this
+       * @public
+       */
+      this.setUTF8 = function(a) {
+        if (typeof a === 'boolean') {
+          utf8 = a;
+        }
+        return this;
+      };
+
+      /* private methods */
+
+      /**
+       * Calculate the rmd160 of a raw string
+       */
+
+      function rstr(s) {
+        s = (utf8) ? utf8Encode(s) : s;
+        return binl2rstr(binl(rstr2binl(s), s.length * 8));
+      }
+
+      /**
+       * Calculate the HMAC-rmd160 of a key and some data (raw strings)
+       */
+
+      function rstr_hmac(key, data) {
+        key = (utf8) ? utf8Encode(key) : key;
+        data = (utf8) ? utf8Encode(data) : data;
+        var i, hash,
+          bkey = rstr2binl(key),
+          ipad = Array(16),
+          opad = Array(16);
+
+        if (bkey.length > 16) {
+          bkey = binl(bkey, key.length * 8);
+        }
+
+        for (i = 0; i < 16; i += 1) {
+          ipad[i] = bkey[i] ^ 0x36363636;
+          opad[i] = bkey[i] ^ 0x5C5C5C5C;
+        }
+        hash = binl(ipad.concat(rstr2binl(data)), 512 + data.length * 8);
+        return binl2rstr(binl(opad.concat(hash), 512 + 160));
+      }
+
+      /**
+       * Convert an array of little-endian words to a string
+       */
+
+      function binl2rstr(input) {
+        var i, output = '',
+          l = input.length * 32;
+        for (i = 0; i < l; i += 8) {
+          output += String.fromCharCode((input[i >> 5] >>> (i % 32)) & 0xFF);
+        }
+        return output;
+      }
+
+      /**
+       * Calculate the RIPE-MD160 of an array of little-endian words, and a bit length.
+       */
+
+      function binl(x, len) {
+        var T, j, i, l,
+          h0 = 0x67452301,
+          h1 = 0xefcdab89,
+          h2 = 0x98badcfe,
+          h3 = 0x10325476,
+          h4 = 0xc3d2e1f0,
+          A1, B1, C1, D1, E1,
+          A2, B2, C2, D2, E2;
+
+        /* append padding */
+        x[len >> 5] |= 0x80 << (len % 32);
+        x[(((len + 64) >>> 9) << 4) + 14] = len;
+        l = x.length;
+
+        for (i = 0; i < l; i += 16) {
+          A1 = A2 = h0;
+          B1 = B2 = h1;
+          C1 = C2 = h2;
+          D1 = D2 = h3;
+          E1 = E2 = h4;
+          for (j = 0; j <= 79; j += 1) {
+            T = safe_add(A1, rmd160_f(j, B1, C1, D1));
+            T = safe_add(T, x[i + rmd160_r1[j]]);
+            T = safe_add(T, rmd160_K1(j));
+            T = safe_add(bit_rol(T, rmd160_s1[j]), E1);
+            A1 = E1;
+            E1 = D1;
+            D1 = bit_rol(C1, 10);
+            C1 = B1;
+            B1 = T;
+            T = safe_add(A2, rmd160_f(79 - j, B2, C2, D2));
+            T = safe_add(T, x[i + rmd160_r2[j]]);
+            T = safe_add(T, rmd160_K2(j));
+            T = safe_add(bit_rol(T, rmd160_s2[j]), E2);
+            A2 = E2;
+            E2 = D2;
+            D2 = bit_rol(C2, 10);
+            C2 = B2;
+            B2 = T;
+          }
+
+          T = safe_add(h1, safe_add(C1, D2));
+          h1 = safe_add(h2, safe_add(D1, E2));
+          h2 = safe_add(h3, safe_add(E1, A2));
+          h3 = safe_add(h4, safe_add(A1, B2));
+          h4 = safe_add(h0, safe_add(B1, C2));
+          h0 = T;
+        }
+        return [h0, h1, h2, h3, h4];
+      }
+
+      // specific algorithm methods
+
+      function rmd160_f(j, x, y, z) {
+        return (0 <= j && j <= 15) ? (x ^ y ^ z) :
+          (16 <= j && j <= 31) ? (x & y) | (~x & z) :
+          (32 <= j && j <= 47) ? (x | ~y) ^ z :
+          (48 <= j && j <= 63) ? (x & z) | (y & ~z) :
+          (64 <= j && j <= 79) ? x ^ (y | ~z) :
+          'rmd160_f: j out of range';
+      }
+
+      function rmd160_K1(j) {
+        return (0 <= j && j <= 15) ? 0x00000000 :
+          (16 <= j && j <= 31) ? 0x5a827999 :
+          (32 <= j && j <= 47) ? 0x6ed9eba1 :
+          (48 <= j && j <= 63) ? 0x8f1bbcdc :
+          (64 <= j && j <= 79) ? 0xa953fd4e :
+          'rmd160_K1: j out of range';
+      }
+
+      function rmd160_K2(j) {
+        return (0 <= j && j <= 15) ? 0x50a28be6 :
+          (16 <= j && j <= 31) ? 0x5c4dd124 :
+          (32 <= j && j <= 47) ? 0x6d703ef3 :
+          (48 <= j && j <= 63) ? 0x7a6d76e9 :
+          (64 <= j && j <= 79) ? 0x00000000 :
+          'rmd160_K2: j out of range';
+      }
+    }
   };
 
-  Promise.resolve = function (value) {
-    if (value && typeof value === 'object' && value.constructor === Promise) {
-      return value;
+  // exposes Hashes
+  (function(window, undefined) {
+    var freeExports = false;
+    if (typeof exports === 'object') {
+      freeExports = exports;
+      if (exports && typeof global === 'object' && global && global === global.global) {
+        window = global;
+      }
     }
 
-    return new Promise(function (resolve) {
-      resolve(value);
-    });
-  };
-
-  Promise.reject = function (value) {
-    return new Promise(function (resolve, reject) {
-      reject(value);
-    });
-  };
-
-  Promise.race = function (values) {
-    return new Promise(function (resolve, reject) {
-      for (var i = 0, len = values.length; i < len; i++) {
-        values[i].then(resolve, reject);
+    if (typeof define === 'function' && typeof define.amd === 'object' && define.amd) {
+      // define as an anonymous module, so, through path mapping, it can be aliased
+      define(function() {
+        return Hashes;
+      });
+    } else if (freeExports) {
+      // in Node.js or RingoJS v0.8.0+
+      if (typeof module === 'object' && module && module.exports === freeExports) {
+        module.exports = Hashes;
       }
-    });
-  };
-
-  /**
-   * Set the immediate function to execute callbacks
-   * @param fn {function} Function to execute
-   * @private
-   */
-  Promise._setImmediateFn = function _setImmediateFn(fn) {
-    asap = fn;
-  };
-
-  Promise._setUnhandledRejectionFn = function _setUnhandledRejectionFn(fn) {
-    onUnhandledRejection = fn;
-  };
-
-  if (typeof module !== 'undefined' && module.exports) {
-    module.exports = Promise;
-  } else if (!root.Promise) {
-    root.Promise = Promise;
-  }
-
-})(this);
+      // in Narwhal or RingoJS v0.7.0-
+      else {
+        freeExports.Hashes = Hashes;
+      }
+    } else {
+      // in a browser or Rhino
+      window.Hashes = Hashes;
+    }
+  }(this));
+}()); // IIFE
 
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -7913,2422 +9449,800 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ ])
 });
 ;
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
-'use strict';
-/* eslint-disable no-unused-vars */
-var hasOwnProperty = Object.prototype.hasOwnProperty;
-var propIsEnumerable = Object.prototype.propertyIsEnumerable;
-
-function toObject(val) {
-	if (val === null || val === undefined) {
-		throw new TypeError('Object.assign cannot be called with null or undefined');
-	}
-
-	return Object(val);
-}
-
-function shouldUseNative() {
-	try {
-		if (!Object.assign) {
-			return false;
-		}
-
-		// Detect buggy property enumeration order in older V8 versions.
-
-		// https://bugs.chromium.org/p/v8/issues/detail?id=4118
-		var test1 = new String('abc');  // eslint-disable-line
-		test1[5] = 'de';
-		if (Object.getOwnPropertyNames(test1)[0] === '5') {
-			return false;
-		}
-
-		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
-		var test2 = {};
-		for (var i = 0; i < 10; i++) {
-			test2['_' + String.fromCharCode(i)] = i;
-		}
-		var order2 = Object.getOwnPropertyNames(test2).map(function (n) {
-			return test2[n];
-		});
-		if (order2.join('') !== '0123456789') {
-			return false;
-		}
-
-		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
-		var test3 = {};
-		'abcdefghijklmnopqrst'.split('').forEach(function (letter) {
-			test3[letter] = letter;
-		});
-		if (Object.keys(Object.assign({}, test3)).join('') !==
-				'abcdefghijklmnopqrst') {
-			return false;
-		}
-
-		return true;
-	} catch (e) {
-		// We don't expect any of the above to throw, but better to be safe.
-		return false;
-	}
-}
-
-module.exports = shouldUseNative() ? Object.assign : function (target, source) {
-	var from;
-	var to = toObject(target);
-	var symbols;
-
-	for (var s = 1; s < arguments.length; s++) {
-		from = Object(arguments[s]);
-
-		for (var key in from) {
-			if (hasOwnProperty.call(from, key)) {
-				to[key] = from[key];
-			}
-		}
-
-		if (Object.getOwnPropertySymbols) {
-			symbols = Object.getOwnPropertySymbols(from);
-			for (var i = 0; i < symbols.length; i++) {
-				if (propIsEnumerable.call(from, symbols[i])) {
-					to[symbols[i]] = from[symbols[i]];
-				}
-			}
-		}
-	}
-
-	return to;
-};
-
-},{}],2:[function(_dereq_,module,exports){
-/*
- * Copyright 2015 Google Inc. All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+/**
+ * @file A fantasy name generator library.
+ * @version 1.0.0
+ * @license Public Domain
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This library is designed after the RinkWorks Fantasy Name Generator.
+ * @see http://www.rinkworks.com/namegen/
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @example
+ * var generator = NameGen.compile("sV'i");
+ * generator.toString();  // Emits a new name on each call
+ * // => "entheu'loaf"
+ *
+ * ## Pattern Syntax
+ *
+ *   The compile() function creates a name generator based on an input
+ * pattern. The letters s, v, V, c, B, C, i, m, M, D, and d represent
+ * different types of random replacements. Everything else is emitted
+ * literally.
+ *
+ *   s - generic syllable
+ *   v - vowel
+ *   V - vowel or vowel combination
+ *   c - consonant
+ *   B - consonant or consonant combination suitable for beginning a word
+ *   C - consonant or consonant combination suitable anywhere in a word
+ *   i - insult
+ *   m - mushy name
+ *   M - mushy name ending
+ *   D - consonant suited for a stupid person's name
+ *   d - syllable suited for a stupid person's name (begins with a vowel)
+ *
+ *   All characters between parenthesis () are emitted literally. For
+ * example, the pattern "s(dim)", emits a random generic syllable
+ * followed by "dim".
+ *
+ *   Characters between angle brackets <> emit patterns from the table
+ * above. Imagine the entire pattern is wrapped in one of these.
+ *
+ *   In both types of groupings, a vertical bar | denotes a random
+ * choice. Empty groups are allowed. For example, "(foo|bar)" emits
+ * either "foo" or "bar". The pattern "<c|v|>" emits a constant,
+ * vowel, or nothing at all.
+ *
+ *   An exclamation point ! means to capitalize the component that
+ * follows it. For example, "!(foo)" will emit "Foo" and "v!s" will
+ * emit a lowercase vowel followed by a capitalized syllable, like
+ * "eRod".
+ *
+ *   A tilde ~ means to reverse the letters of the component that
+ * follows it. For example, "~(foo)" will emit "oof". To reverse an
+ * entire template, wrap it in brackets. For example, to reverse
+ * "sV'i" as a whole use "~<sV'i>". The template "~sV'i" will only
+ * reverse the initial syllable.
+ *
+ * ## Internals
+ *
+ *   A name generator is anything with a toString() method, including,
+ * importantly, strings themselves. The generator constructors
+ * (Random, Sequence) perform additional optimizations when *not* used
+ * with the `new` keyword: they may pass through a provided generator,
+ * combine provided generators, or even return a simple string.
+ *
+ *   New pattern symbols added to NameGen.symbols will automatically
+ * be used by the compiler.
  */
-
-var Util = _dereq_('./util.js');
-
-// Start at a higher number to reduce chance of conflict.
-var nextDisplayId = 1000;
-var hasShowDeprecationWarning = false;
-
-var defaultLeftBounds = [0, 0, 0.5, 1];
-var defaultRightBounds = [0.5, 0, 0.5, 1];
 
 /**
- * The base class for all VR frame data.
+ * Number of generated output possibilities (generator function).
+ * @returns {number}
+ * @method
  */
+String.prototype.combinations = function() { return 1; };
 
-function VRFrameData() {
-  this.leftProjectionMatrix = new Float32Array(16);
-  this.leftViewMatrix = new Float32Array(16);
-  this.rightProjectionMatrix = new Float32Array(16);
-  this.rightViewMatrix = new Float32Array(16);
-  this.pose = null;
+/**
+ * Longest possible output length (generator function).
+ * @returns {number}
+ * @method
+ */
+String.prototype.min = function() { return this.length; };
+
+/**
+ * Shortest possible output length (generator function).
+ * @returns {number}
+ * @method
+ */
+String.prototype.max = function() { return this.length; };
+
+/**
+ * List all possible outputs (generator function).
+ * @returns {Array} An array of output strings.
+ * @method
+ */
+String.prototype.enumerate = function() { return [String(this)]; };
+
+/**
+ * @namespace NameGen Everything relevant to the name generators.
+ */
+var NameGen = NameGen || {};
+
+/**
+ * Strings generated by the symbol generators.
+ */
+NameGen.symbols = {
+    s: ['ach', 'ack', 'ad', 'age', 'ald', 'ale', 'an', 'ang', 'ar', 'ard',
+        'as', 'ash', 'at', 'ath', 'augh', 'aw', 'ban', 'bel', 'bur', 'cer',
+        'cha', 'che', 'dan', 'dar', 'del', 'den', 'dra', 'dyn', 'ech', 'eld',
+        'elm', 'em', 'en', 'end', 'eng', 'enth', 'er', 'ess', 'est', 'et',
+        'gar', 'gha', 'hat', 'hin', 'hon', 'ia', 'ight', 'ild', 'im', 'ina',
+        'ine', 'ing', 'ir', 'is', 'iss', 'it', 'kal', 'kel', 'kim', 'kin',
+        'ler', 'lor', 'lye', 'mor', 'mos', 'nal', 'ny', 'nys', 'old', 'om',
+        'on', 'or', 'orm', 'os', 'ough', 'per', 'pol', 'qua', 'que', 'rad',
+        'rak', 'ran', 'ray', 'ril', 'ris', 'rod', 'roth', 'ryn', 'sam',
+        'say', 'ser', 'shy', 'skel', 'sul', 'tai', 'tan', 'tas', 'ther',
+        'tia', 'tin', 'ton', 'tor', 'tur', 'um', 'und', 'unt', 'urn', 'usk',
+        'ust', 'ver', 'ves', 'vor', 'war', 'wor', 'yer'],
+    v: ['a', 'e', 'i', 'o', 'u', 'y'],
+    V: ['a', 'e', 'i', 'o', 'u', 'y', 'ae', 'ai', 'au', 'ay', 'ea', 'ee',
+        'ei', 'eu', 'ey', 'ia', 'ie', 'oe', 'oi', 'oo', 'ou', 'ui'],
+    c: ['b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'q', 'r',
+        's', 't', 'v', 'w', 'x', 'y', 'z'],
+    B: ['b', 'bl', 'br', 'c', 'ch', 'chr', 'cl', 'cr', 'd', 'dr', 'f', 'g',
+        'h', 'j', 'k', 'l', 'll', 'm', 'n', 'p', 'ph', 'qu', 'r', 'rh', 's',
+        'sch', 'sh', 'sl', 'sm', 'sn', 'st', 'str', 'sw', 't', 'th', 'thr',
+        'tr', 'v', 'w', 'wh', 'y', 'z', 'zh'],
+    C: ['b', 'c', 'ch', 'ck', 'd', 'f', 'g', 'gh', 'h', 'k', 'l', 'ld', 'll',
+        'lt', 'm', 'n', 'nd', 'nn', 'nt', 'p', 'ph', 'q', 'r', 'rd', 'rr',
+        'rt', 's', 'sh', 'ss', 'st', 't', 'th', 'v', 'w', 'y', 'z'],
+    i: ['air', 'ankle', 'ball', 'beef', 'bone', 'bum', 'bumble', 'bump',
+        'cheese', 'clod', 'clot', 'clown', 'corn', 'dip', 'dolt', 'doof',
+        'dork', 'dumb', 'face', 'finger', 'foot', 'fumble', 'goof',
+        'grumble', 'head', 'knock', 'knocker', 'knuckle', 'loaf', 'lump',
+        'lunk', 'meat', 'muck', 'munch', 'nit', 'numb', 'pin', 'puff',
+        'skull', 'snark', 'sneeze', 'thimble', 'twerp', 'twit', 'wad',
+        'wimp', 'wipe'],
+    m: ['baby', 'booble', 'bunker', 'cuddle', 'cuddly', 'cutie', 'doodle',
+        'foofie', 'gooble', 'honey', 'kissie', 'lover', 'lovey', 'moofie',
+        'mooglie', 'moopie', 'moopsie', 'nookum', 'poochie', 'poof',
+        'poofie', 'pookie', 'schmoopie', 'schnoogle', 'schnookie',
+        'schnookum', 'smooch', 'smoochie', 'smoosh', 'snoogle', 'snoogy',
+        'snookie', 'snookum', 'snuggy', 'sweetie', 'woogle', 'woogy',
+        'wookie', 'wookum', 'wuddle', 'wuddly', 'wuggy', 'wunny'],
+    M: ['boo', 'bunch', 'bunny', 'cake', 'cakes', 'cute', 'darling',
+        'dumpling', 'dumplings', 'face', 'foof', 'goo', 'head', 'kin',
+        'kins', 'lips', 'love', 'mush', 'pie', 'poo', 'pooh', 'pook', 'pums'],
+    D: ['b', 'bl', 'br', 'cl', 'd', 'f', 'fl', 'fr', 'g', 'gh', 'gl', 'gr',
+        'h', 'j', 'k', 'kl', 'm', 'n', 'p', 'th', 'w'],
+    d: ['elch', 'idiot', 'ob', 'og', 'ok', 'olph', 'olt', 'omph', 'ong',
+        'onk', 'oo', 'oob', 'oof', 'oog', 'ook', 'ooz', 'org', 'ork', 'orm',
+        'oron', 'ub', 'uck', 'ug', 'ulf', 'ult', 'um', 'umb', 'ump', 'umph',
+        'un', 'unb', 'ung', 'unk', 'unph', 'unt', 'uzz']
 };
 
 /**
- * The base class for all VR displays.
+ * Return true if the given thing is a string.
+ * @param object - The object to be tested
+ * @returns {boolean}
+ * @private
  */
-function VRDisplay() {
-  this.isPolyfilled = true;
-  this.displayId = nextDisplayId++;
-  this.displayName = 'webvr-polyfill displayName';
-
-  this.depthNear = 0.01;
-  this.depthFar = 10000.0;
-
-  this.isConnected = true;
-  this.isPresenting = false;
-  this.capabilities = {
-    hasPosition: false,
-    hasOrientation: false,
-    hasExternalDisplay: false,
-    canPresent: false,
-    maxLayers: 1
-  };
-  this.stageParameters = null;
-
-  // "Private" members.
-  this.waitingForPresent_ = false;
-  this.layer_ = null;
-
-  this.fullscreenElement_ = null;
-  this.fullscreenWrapper_ = null;
-  this.fullscreenElementCachedStyle_ = null;
-
-  this.fullscreenEventTarget_ = null;
-  this.fullscreenChangeHandler_ = null;
-  this.fullscreenErrorHandler_ = null;
-}
-
-VRDisplay.prototype.getFrameData = function(frameData) {
-  // TODO: Technically this should retain it's value for the duration of a frame
-  // but I doubt that's practical to do in javascript.
-  return Util.frameDataFromPose(frameData, this.getPose(), this);
+NameGen._isString = function(object) {
+    return Object.prototype.toString.call(object) === '[object String]';
 };
 
-VRDisplay.prototype.getPose = function() {
-  // TODO: Technically this should retain it's value for the duration of a frame
-  // but I doubt that's practical to do in javascript.
-  return this.getImmediatePose();
-};
-
-VRDisplay.prototype.requestAnimationFrame = function(callback) {
-  return window.requestAnimationFrame(callback);
-};
-
-VRDisplay.prototype.cancelAnimationFrame = function(id) {
-  return window.cancelAnimationFrame(id);
-};
-
-VRDisplay.prototype.wrapForFullscreen = function(element) {
-  // Don't wrap in iOS.
-  if (Util.isIOS()) {
-    return element;
-  }
-  if (!this.fullscreenWrapper_) {
-    this.fullscreenWrapper_ = document.createElement('div');
-    var cssProperties = [
-      'height: ' + Math.min(screen.height, screen.width) + 'px !important',
-      'top: 0 !important',
-      'left: 0 !important',
-      'right: 0 !important',
-      'border: 0',
-      'margin: 0',
-      'padding: 0',
-      'z-index: 999999 !important',
-      'position: fixed',
-    ];
-    this.fullscreenWrapper_.setAttribute('style', cssProperties.join('; ') + ';');
-    this.fullscreenWrapper_.classList.add('webvr-polyfill-fullscreen-wrapper');
-  }
-
-  if (this.fullscreenElement_ == element) {
-    return this.fullscreenWrapper_;
-  }
-
-  // Remove any previously applied wrappers
-  this.removeFullscreenWrapper();
-
-  this.fullscreenElement_ = element;
-  var parent = this.fullscreenElement_.parentElement;
-  parent.insertBefore(this.fullscreenWrapper_, this.fullscreenElement_);
-  parent.removeChild(this.fullscreenElement_);
-  this.fullscreenWrapper_.insertBefore(this.fullscreenElement_, this.fullscreenWrapper_.firstChild);
-  this.fullscreenElementCachedStyle_ = this.fullscreenElement_.getAttribute('style');
-
-  var self = this;
-  function applyFullscreenElementStyle() {
-    if (!self.fullscreenElement_) {
-      return;
-    }
-
-    var cssProperties = [
-      'position: absolute',
-      'top: 0',
-      'left: 0',
-      'width: ' + Math.max(screen.width, screen.height) + 'px',
-      'height: ' + Math.min(screen.height, screen.width) + 'px',
-      'border: 0',
-      'margin: 0',
-      'padding: 0',
-    ];
-    self.fullscreenElement_.setAttribute('style', cssProperties.join('; ') + ';');
-  }
-
-  applyFullscreenElementStyle();
-
-  return this.fullscreenWrapper_;
-};
-
-VRDisplay.prototype.removeFullscreenWrapper = function() {
-  if (!this.fullscreenElement_) {
-    return;
-  }
-
-  var element = this.fullscreenElement_;
-  if (this.fullscreenElementCachedStyle_) {
-    element.setAttribute('style', this.fullscreenElementCachedStyle_);
-  } else {
-    element.removeAttribute('style');
-  }
-  this.fullscreenElement_ = null;
-  this.fullscreenElementCachedStyle_ = null;
-
-  var parent = this.fullscreenWrapper_.parentElement;
-  this.fullscreenWrapper_.removeChild(element);
-  parent.insertBefore(element, this.fullscreenWrapper_);
-  parent.removeChild(this.fullscreenWrapper_);
-
-  return element;
-};
-
-VRDisplay.prototype.requestPresent = function(layers) {
-  var wasPresenting = this.isPresenting;
-  var self = this;
-
-  if (!(layers instanceof Array)) {
-    if (!hasShowDeprecationWarning) {
-      console.warn("Using a deprecated form of requestPresent. Should pass in an array of VRLayers.");
-      hasShowDeprecationWarning = true;
-    }
-    layers = [layers];
-  }
-
-  return new Promise(function(resolve, reject) {
-    if (!self.capabilities.canPresent) {
-      reject(new Error('VRDisplay is not capable of presenting.'));
-      return;
-    }
-
-    if (layers.length == 0 || layers.length > self.capabilities.maxLayers) {
-      reject(new Error('Invalid number of layers.'));
-      return;
-    }
-
-    var incomingLayer = layers[0];
-    if (!incomingLayer.source) {
-      /*
-      todo: figure out the correct behavior if the source is not provided.
-      see https://github.com/w3c/webvr/issues/58
-      */
-      resolve();
-      return;
-    }
-
-    var leftBounds = incomingLayer.leftBounds || defaultLeftBounds;
-    var rightBounds = incomingLayer.rightBounds || defaultRightBounds;
-    if (wasPresenting) {
-      // Already presenting, just changing configuration
-      var changed = false;
-      var layer = self.layer_;
-      if (layer.source !== incomingLayer.source) {
-        layer.source = incomingLayer.source;
-        changed = true;
-      }
-
-      for (var i = 0; i < 4; i++) {
-        if (layer.leftBounds[i] !== leftBounds[i]) {
-          layer.leftBounds[i] = leftBounds[i];
-          changed = true;
+/**
+ * Combine adjacent strings in the array.
+ * @param {Array} array - The array to be compressed (unmodified)
+ * @returns {Array} A new array with the strings compressed
+ * @private
+ */
+NameGen._compress = function(array) {
+    var emit = [], accum = [];
+    function dump() {
+        if (accum.length > 0) {
+            emit.push(accum.join(''));
+            accum.length = 0;
         }
-        if (layer.rightBounds[i] !== rightBounds[i]) {
-          layer.rightBounds[i] = rightBounds[i];
-          changed = true;
+    }
+    for (var i = 0; i < array.length; i++) {
+        if (NameGen._isString(array[i])) {
+            accum.push(array[i]);
+        } else {
+            dump();
+            emit.push(array[i]);
         }
-      }
+    }
+    dump();
+    return emit;
+};
 
-      if (changed) {
-        self.fireVRDisplayPresentChange_();
-      }
-      resolve();
-      return;
+/**
+ * @param {string} string
+ * @returns {string}
+ */
+NameGen._capitalize = function(string) {
+    return string.replace(/^./, function(c) {
+        return c.toUpperCase();
+    });
+};
+
+/**
+ * @param {string} string
+ * @returns {string}
+ */
+NameGen._reverse = function(string) {
+    return string.split(/(?:)/).reverse().join('');
+};
+
+/**
+ * When emitting, selects a random generator.
+ * @param {Array} generators - An array of name generators
+ * @returns A name generator, not necessarily a new one
+ * @constructor
+ */
+NameGen.Random = function Random(generators) {
+    if (!(this instanceof NameGen.Random)) {
+        switch (generators.length) {
+        case 0:
+            return '';
+        case 1:
+            return generators[0];
+        default:
+            return new NameGen.Random(generators);
+        }
+    }
+    this.sub = generators;
+    return this;
+};
+
+/**
+ * Generate a new name.
+ * @returns {string}
+ * @method
+ */
+NameGen.Random.prototype.toString = function() {
+    if (this.sub.length > 0) {
+        var i = Math.floor(Math.random() * this.sub.length);
+        return this.sub[i].toString();
+    } else {
+        return '';
+    }
+};
+
+/**
+ * Number of generated output possibilities (generator function).
+ * @returns {number}
+ * @method
+ */
+NameGen.Random.prototype.combinations = function() {
+    return Math.max(1, this.sub.reduce(function(total, g) {
+        return total + g.combinations();
+    }, 0));
+};
+
+/**
+ * Shortest possible output length (generator function).
+ * @returns {number}
+ * @method
+ */
+NameGen.Random.prototype.min = function() {
+    return Math.min.apply(null, this.sub.map(function(g) {
+        return g.min();
+    }));
+};
+
+/**
+ * Longest possible output length (generator function).
+ * @returns {number}
+ * @method
+ */
+NameGen.Random.prototype.max = function() {
+    return Math.max.apply(null, this.sub.map(function(g) {
+        return g.max();
+    }));
+};
+
+/**
+ * Enumerate all possible outputs.
+ * @returns {Array} An array of all possible outputs.
+ * @method
+ */
+NameGen.Random.prototype.enumerate = function() {
+    var enums = this.sub.map(function(g) { return g.enumerate(); });
+    return Array.prototype.concat.apply(enums[0], enums.slice(1));
+};
+
+/**
+ * Runs each provided generator in turn when generating.
+ * @param {Array} generators - An array of name generators
+ * @returns A name generator, not necessarily a new one
+ * @constructor
+ */
+NameGen.Sequence = function Sequence(generators) {
+    generators = NameGen._compress(generators);
+    if (!(this instanceof NameGen.Sequence)) {
+        switch (generators.length) {
+        case 0:
+            return '';
+        case 1:
+            return generators[0];
+        default:
+            return new NameGen.Sequence(generators);
+        }
+    }
+    this.sub = generators;
+    return this;
+};
+
+/**
+ * Generate a new name.
+ * @returns {string}
+ * @method
+ */
+NameGen.Sequence.prototype.toString = function() {
+    return this.sub.join('');
+};
+
+/**
+ * Number of generated output possibilities (generator function).
+ * @returns {number}
+ * @method
+ */
+NameGen.Sequence.prototype.combinations = function() {
+    return this.sub.reduce(function(total, g) {
+        return total * g.combinations();
+    }, 1);
+};
+
+/**
+ * Shortest possible output length (generator function).
+ * @returns {number}
+ * @method
+ */
+NameGen.Sequence.prototype.min = function() {
+    return this.sub.reduce(function(total, g) {
+        return total + g.min();
+    }, 0);
+};
+
+/**
+ * Longest possible output length (generator function).
+ * @returns {number}
+ * @method
+ */
+NameGen.Sequence.prototype.max = function() {
+    return this.sub.reduce(function(total, g) {
+        return total + g.max();
+    }, 0);
+};
+
+/**
+ * Enumerate all possible outputs.
+ * @returns {Array} An array of all possible outputs.
+ * @method
+ */
+NameGen.Sequence.prototype.enumerate = function() {
+    var enums = this.sub.map(function(g) { return g.enumerate(); });
+    function enumerate(enums, prefix) {
+        if (enums.length === 1) {
+            return enums[0].map(function(e) {
+                return prefix + e;
+            });
+        } else {
+            var output = [];
+            var rest = enums.slice(1);
+            for (var i = 0; i < enums[0].length; i++) {
+                output.push(enumerate(rest, prefix + enums[0][i]));
+            }
+            return Array.prototype.concat.apply([], output);
+        }
+    }
+    return enumerate(enums, '');
+};
+
+/**
+ * Create a new type of generator based on a string transform function.
+ * @param {Function} f
+ */
+NameGen.fromTransform = function(f) {
+    function G(generator) {
+        if (!(this instanceof G)) {
+            if (NameGen._isString(generator)) {
+                return f(generator);
+            } else {
+                return new G(generator);
+            }
+        }
+        this.generator = generator;
+        return this;
     }
 
-    // Was not already presenting.
-    self.layer_ = {
-      predistorted: incomingLayer.predistorted,
-      source: incomingLayer.source,
-      leftBounds: leftBounds.slice(0),
-      rightBounds: rightBounds.slice(0)
+    G.prototype.toString = function() {
+        return f(this.generator.toString());
+    };
+    G.prototype.combinations = function() {
+        return this.generator.combinations();
+    };
+    G.prototype.min = function() {
+        return this.generator.min();
+    };
+    G.prototype.max = function() {
+        return this.generator.max();
+    };
+    G.prototype.enumerate = function() {
+        return this.generator.enumerate().map(f);
     };
 
-    self.waitingForPresent_ = false;
-    if (self.layer_ && self.layer_.source) {
-      var fullscreenElement = self.wrapForFullscreen(self.layer_.source);
+    return G;
+};
 
-      function onFullscreenChange() {
-        var actualFullscreenElement = Util.getFullscreenElement();
+/**
+ * Decorate a generator by capitalizing its output.
+ * @constructor
+ */
+NameGen.Capitalizer = NameGen.fromTransform(NameGen._capitalize);
 
-        self.isPresenting = (fullscreenElement === actualFullscreenElement);
-        if (self.isPresenting) {
-          if (screen.orientation && screen.orientation.lock) {
-            screen.orientation.lock('landscape-primary').catch(function(error){
-                    console.error('screen.orientation.lock() failed due to', error.message)
-            });
-          }
-          self.waitingForPresent_ = false;
-          self.beginPresent_();
-          resolve();
-        } else {
-          if (screen.orientation && screen.orientation.unlock) {
-            screen.orientation.unlock();
-          }
-          self.removeFullscreenWrapper();
-          self.endPresent_();
-          self.removeFullscreenListeners_();
+/**
+ * Decorate a generator by reversing its output.
+ * @constructor
+ */
+NameGen.Reverser = NameGen.fromTransform(NameGen._reverse);
+
+/* Everything below here is the compiler. */
+
+/**
+ * Builds up a generator grouping in the compiler.
+ * @constructor
+ */
+NameGen._Group = function() {
+    this.set = [[]];
+    this.wrappers = [];
+};
+
+/**
+ * @param g The generator to add to this group
+ * @returns This object
+ */
+NameGen._Group.prototype.add = function(g) {
+    while (this.wrappers.length > 0) {
+        var type = this.wrappers.pop();
+        g = type(g);
+    }
+    this.set[this.set.length - 1].push(g);
+    return this;
+};
+
+/**
+ * Start a new grouping in this generator group.
+ * @returns This object
+ */
+NameGen._Group.prototype.split = function() {
+    this.set.push([]);
+    return this;
+};
+
+/**
+ * Wrap the next added generator with this decorator.
+ * @param type The type of the decorator to wrap.
+ * @returns This object
+ */
+NameGen._Group.prototype.wrap = function(type) {
+    this.wrappers.push(type);
+    return this;
+};
+
+/**
+ * @returns A generator built from this grouping.
+ */
+NameGen._Group.prototype.emit = function() {
+    return NameGen.Random(this.set.map(NameGen.Sequence));
+};
+
+/**
+ * Builds up a literal grouping in the compiler.
+ * @constructor
+ */
+NameGen._Literal = function() {
+    NameGen._Group.call(this);
+};
+NameGen._Literal.prototype = Object.create(NameGen._Group.prototype);
+
+/**
+ * Builds up a symbolic grouping in the compiler.
+ * @constructor
+ */
+NameGen._Symbol = function() {
+    NameGen._Group.call(this);
+};
+NameGen._Symbol.prototype = Object.create(NameGen._Group.prototype);
+
+/**
+ * Add a new generator based on a character.
+ * @param c The generator's symbol
+ * @returns This object
+ */
+NameGen._Symbol.prototype.add = function(g, literal) {
+    if (!literal) {
+        g = NameGen.Random(NameGen.symbols[g] || [g]);
+    }
+    NameGen._Group.prototype.add.call(this, g);
+    return this;
+};
+
+/**
+ * Compile a generator specification string into a generator.
+ * @param {string} input - The pattern string to compile
+ * @returns A name generator
+ */
+NameGen.compile = function(input) {
+    var stack = [];
+    stack.top = function() {
+        return stack[stack.length - 1];
+    };
+
+    stack.push(new NameGen._Symbol());
+    for (var i = 0; i < input.length; i++) {
+        var c = input[i];
+        switch (c) {
+        case '<':
+            stack.push(new NameGen._Symbol());
+            break;
+        case '(':
+            stack.push(new NameGen._Literal());
+            break;
+        case '>':
+        case ')':
+            if (stack.length === 1) {
+                throw new Error('Unbalanced brackets.');
+            } else if (c === '>' && stack.top() instanceof NameGen._Literal) {
+                throw new Error('Unexpected ">" in input.');
+            } else if (c === ')' && stack.top() instanceof NameGen._Symbol) {
+                throw new Error('Unexpected ")" in input.');
+            }
+            var last = stack.pop().emit();
+            stack.top().add(last, true);
+            break;
+        case '|':
+            stack.top().split();
+            break;
+        case '!':
+            if (stack.top() instanceof NameGen._Symbol) {
+                stack.top().wrap(NameGen.Capitalizer);
+            } else {
+                stack.top().add(c);
+            }
+            break;
+        case '~':
+            if (stack.top() instanceof NameGen._Symbol) {
+                stack.top().wrap(NameGen.Reverser);
+            } else {
+                stack.top().add(c);
+            }
+            break;
+        default:
+            stack.top().add(c);
+            break;
         }
-        self.fireVRDisplayPresentChange_();
+    }
+    if (stack.length !== 1) {
+        throw new Error('Missing closing bracket.');
+    } else {
+        return stack.top().emit();
+    }
+};
+
+(function (root) {
+
+  // Store setTimeout reference so promise-polyfill will be unaffected by
+  // other code modifying setTimeout (like sinon.useFakeTimers())
+  var setTimeoutFunc = setTimeout;
+
+  function noop() {
+  }
+
+  // Use polyfill for setImmediate for performance gains
+  var asap = (typeof setImmediate === 'function' && setImmediate) ||
+    function (fn) {
+      setTimeoutFunc(fn, 0);
+    };
+
+  var onUnhandledRejection = function onUnhandledRejection(err) {
+    if (typeof console !== 'undefined' && console) {
+      console.warn('Possible Unhandled Promise Rejection:', err); // eslint-disable-line no-console
+    }
+  };
+
+  // Polyfill for Function.prototype.bind
+  function bind(fn, thisArg) {
+    return function () {
+      fn.apply(thisArg, arguments);
+    };
+  }
+
+  function Promise(fn) {
+    if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');
+    if (typeof fn !== 'function') throw new TypeError('not a function');
+    this._state = 0;
+    this._handled = false;
+    this._value = undefined;
+    this._deferreds = [];
+
+    doResolve(fn, this);
+  }
+
+  function handle(self, deferred) {
+    while (self._state === 3) {
+      self = self._value;
+    }
+    if (self._state === 0) {
+      self._deferreds.push(deferred);
+      return;
+    }
+    self._handled = true;
+    asap(function () {
+      var cb = self._state === 1 ? deferred.onFulfilled : deferred.onRejected;
+      if (cb === null) {
+        (self._state === 1 ? resolve : reject)(deferred.promise, self._value);
+        return;
       }
-      function onFullscreenError() {
-        if (!self.waitingForPresent_) {
+      var ret;
+      try {
+        ret = cb(self._value);
+      } catch (e) {
+        reject(deferred.promise, e);
+        return;
+      }
+      resolve(deferred.promise, ret);
+    });
+  }
+
+  function resolve(self, newValue) {
+    try {
+      // Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
+      if (newValue === self) throw new TypeError('A promise cannot be resolved with itself.');
+      if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
+        var then = newValue.then;
+        if (newValue instanceof Promise) {
+          self._state = 3;
+          self._value = newValue;
+          finale(self);
+          return;
+        } else if (typeof then === 'function') {
+          doResolve(bind(then, newValue), self);
           return;
         }
-
-        self.removeFullscreenWrapper();
-        self.removeFullscreenListeners_();
-
-        self.waitingForPresent_ = false;
-        self.isPresenting = false;
-
-        reject(new Error('Unable to present.'));
       }
-
-      self.addFullscreenListeners_(fullscreenElement,
-          onFullscreenChange, onFullscreenError);
-
-      if (Util.requestFullscreen(fullscreenElement)) {
-        self.waitingForPresent_ = true;
-      } else if (Util.isIOS()) {
-        // *sigh* Just fake it.
-        self.isPresenting = true;
-        self.beginPresent_();
-        self.fireVRDisplayPresentChange_();
-        resolve();
-      }
-    }
-
-    if (!self.waitingForPresent_ && !Util.isIOS()) {
-      Util.exitFullscreen();
-      reject(new Error('Unable to present.'));
-    }
-  });
-};
-
-VRDisplay.prototype.exitPresent = function() {
-  var wasPresenting = this.isPresenting;
-  var self = this;
-  this.isPresenting = false;
-  this.layer_ = null;
-
-  return new Promise(function(resolve, reject) {
-    if (wasPresenting) {
-      if (!Util.exitFullscreen() && Util.isIOS()) {
-        self.endPresent_();
-        self.fireVRDisplayPresentChange_();
-      }
-
-      resolve();
-    } else {
-      reject(new Error('Was not presenting to VRDisplay.'));
-    }
-  });
-};
-
-VRDisplay.prototype.getLayers = function() {
-  if (this.layer_) {
-    return [this.layer_];
-  }
-  return [];
-};
-
-VRDisplay.prototype.fireVRDisplayPresentChange_ = function() {
-  var event = new CustomEvent('vrdisplaypresentchange', {detail: {vrdisplay: this}});
-  window.dispatchEvent(event);
-};
-
-VRDisplay.prototype.addFullscreenListeners_ = function(element, changeHandler, errorHandler) {
-  this.removeFullscreenListeners_();
-
-  this.fullscreenEventTarget_ = element;
-  this.fullscreenChangeHandler_ = changeHandler;
-  this.fullscreenErrorHandler_ = errorHandler;
-
-  if (changeHandler) {
-    if (document.fullscreenEnabled) {
-      element.addEventListener('fullscreenchange', changeHandler, false);
-    } else if (document.webkitFullscreenEnabled) {
-      element.addEventListener('webkitfullscreenchange', changeHandler, false);
-    } else if (document.mozFullScreenEnabled) {
-      document.addEventListener('mozfullscreenchange', changeHandler, false);
-    } else if (document.msFullscreenEnabled) {
-      element.addEventListener('msfullscreenchange', changeHandler, false);
-    }
-  }
-
-  if (errorHandler) {
-    if (document.fullscreenEnabled) {
-      element.addEventListener('fullscreenerror', errorHandler, false);
-    } else if (document.webkitFullscreenEnabled) {
-      element.addEventListener('webkitfullscreenerror', errorHandler, false);
-    } else if (document.mozFullScreenEnabled) {
-      document.addEventListener('mozfullscreenerror', errorHandler, false);
-    } else if (document.msFullscreenEnabled) {
-      element.addEventListener('msfullscreenerror', errorHandler, false);
-    }
-  }
-};
-
-VRDisplay.prototype.removeFullscreenListeners_ = function() {
-  if (!this.fullscreenEventTarget_)
-    return;
-
-  var element = this.fullscreenEventTarget_;
-
-  if (this.fullscreenChangeHandler_) {
-    var changeHandler = this.fullscreenChangeHandler_;
-    element.removeEventListener('fullscreenchange', changeHandler, false);
-    element.removeEventListener('webkitfullscreenchange', changeHandler, false);
-    document.removeEventListener('mozfullscreenchange', changeHandler, false);
-    element.removeEventListener('msfullscreenchange', changeHandler, false);
-  }
-
-  if (this.fullscreenErrorHandler_) {
-    var errorHandler = this.fullscreenErrorHandler_;
-    element.removeEventListener('fullscreenerror', errorHandler, false);
-    element.removeEventListener('webkitfullscreenerror', errorHandler, false);
-    document.removeEventListener('mozfullscreenerror', errorHandler, false);
-    element.removeEventListener('msfullscreenerror', errorHandler, false);
-  }
-
-  this.fullscreenEventTarget_ = null;
-  this.fullscreenChangeHandler_ = null;
-  this.fullscreenErrorHandler_ = null;
-};
-
-VRDisplay.prototype.beginPresent_ = function() {
-  // Override to add custom behavior when presentation begins.
-};
-
-VRDisplay.prototype.endPresent_ = function() {
-  // Override to add custom behavior when presentation ends.
-};
-
-VRDisplay.prototype.submitFrame = function(pose) {
-  // Override to add custom behavior for frame submission.
-};
-
-VRDisplay.prototype.getEyeParameters = function(whichEye) {
-  // Override to return accurate eye parameters if canPresent is true.
-  return null;
-};
-
-/*
- * Deprecated classes
- */
-
-/**
- * The base class for all VR devices. (Deprecated)
- */
-function VRDevice() {
-  this.isPolyfilled = true;
-  this.hardwareUnitId = 'webvr-polyfill hardwareUnitId';
-  this.deviceId = 'webvr-polyfill deviceId';
-  this.deviceName = 'webvr-polyfill deviceName';
-}
-
-module.exports.VRFrameData = VRFrameData;
-module.exports.VRDisplay = VRDisplay;
-module.exports.VRDevice = VRDevice;
-
-},{"./util.js":10}],3:[function(_dereq_,module,exports){
-/*
- * Copyright 2016 Google Inc. All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-var FusionPoseSensor = _dereq_('./sensor-fusion/fusion-pose-sensor.js');
-var VRDisplay = _dereq_('./base.js').VRDisplay;
-var Util = _dereq_('./util.js');
-
-var Eye = {
-  LEFT: 'left',
-  RIGHT: 'right'
-};
-
-/**
- * VRDisplay based on mobile device parameters and DeviceMotion APIs.
- */
-function CardboardVRDisplay() {
-  this.displayName = 'Google Cardboard';
-
-  this.capabilities.hasOrientation = true;
-  this.capabilities.canPresent = true;
-
-  // "Private" members.
-  this.poseSensor_ = new FusionPoseSensor();
-
-  if (Util.isIOS()) {
-    // Listen for resize events to workaround this awful Safari bug.
-    window.addEventListener('resize', this.onResize_.bind(this));
-  }
-}
-CardboardVRDisplay.prototype = new VRDisplay();
-
-CardboardVRDisplay.prototype.getImmediatePose = function() {
-  return {
-    position: this.poseSensor_.getPosition(),
-    orientation: this.poseSensor_.getOrientation(),
-    linearVelocity: null,
-    linearAcceleration: null,
-    angularVelocity: null,
-    angularAcceleration: null
-  };
-};
-
-CardboardVRDisplay.prototype.resetPose = function() {
-  this.poseSensor_.resetPose();
-};
-
-CardboardVRDisplay.prototype.getEyeParameters = function(whichEye) {
-  var offset = [0.03, 0.0, 0.0];
-  var fieldOfView;
-
-  if (whichEye == Eye.LEFT) {
-    offset[0] *= -1.0;
-  }
-
-  return {
-    fieldOfView: {upDegrees: 40, leftDegrees: 40, rightDegrees: 40, downDegrees: 40},
-    offset: offset,
-    renderWidth: devicePixelRatio * 0.5 * screen.width,
-    renderHeight: devicePixelRatio * screen.height,
-  };
-};
-
-CardboardVRDisplay.prototype.beginPresent_ = function() {
-  // Listen for orientation change events in order to show interstitial.
-  this.orientationHandler = this.onOrientationChange_.bind(this);
-  window.addEventListener('orientationchange', this.orientationHandler);
-};
-
-CardboardVRDisplay.prototype.endPresent_ = function() {
-  window.removeEventListener('orientationchange', this.orientationHandler);
-};
-
-CardboardVRDisplay.prototype.submitFrame = function(pose) {
-};
-
-CardboardVRDisplay.prototype.onOrientationChange_ = function(e) {
-  console.log('onOrientationChange_');
-  this.onResize_();
-};
-
-CardboardVRDisplay.prototype.onResize_ = function(e) {
-  if (this.layer_) {
-    // Size the CSS canvas.
-    // Added padding on right and bottom because iPhone 5 will not
-    // hide the URL bar unless content is bigger than the screen.
-    // This will not be visible as long as the container element (e.g. body)
-    // is set to 'overflow: hidden'.
-    var cssProperties = [
-      'position: absolute',
-      'top: 0',
-      'left: 0',
-      'width: ' + Math.max(screen.width, screen.height) + 'px',
-      'height: ' + Math.min(screen.height, screen.width) + 'px',
-      'border: 0',
-      'margin: 0',
-      'padding: 0 10px 10px 0',
-    ];
-    this.layer_.source.setAttribute('style', cssProperties.join('; ') + ';');
-
-    Util.safariCssSizeWorkaround(this.layer_.source);
-  }
-};
-
-module.exports = CardboardVRDisplay;
-
-},{"./base.js":2,"./sensor-fusion/fusion-pose-sensor.js":7,"./util.js":10}],4:[function(_dereq_,module,exports){
-/*
- * Copyright 2015 Google Inc. All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-var Util = _dereq_('./util.js');
-var WebVRPolyfill = _dereq_('./webvr-polyfill.js').WebVRPolyfill;
-
-// Initialize a WebVRConfig just in case.
-window.WebVRConfig = Util.extend({
-  // Forces availability of VR mode, even for non-mobile devices.
-  FORCE_ENABLE_VR: false,
-
-  // Complementary filter coefficient. 0 for accelerometer, 1 for gyro.
-  K_FILTER: 0.98,
-
-  // How far into the future to predict during fast motion (in seconds).
-  PREDICTION_TIME_S: 0.040,
-
-  // Flag to enable touch panner. In case you have your own touch controls.
-  TOUCH_PANNER_DISABLED: true,
-
-  // Flag to disabled the UI in VR Mode.
-  CARDBOARD_UI_DISABLED: false, // Default: false
-
-  // Flag to disable the instructions to rotate your device.
-  ROTATE_INSTRUCTIONS_DISABLED: false, // Default: false.
-
-  // Enable yaw panning only, disabling roll and pitch. This can be useful
-  // for panoramas with nothing interesting above or below.
-  YAW_ONLY: false,
-
-  // To disable keyboard and mouse controls, if you want to use your own
-  // implementation.
-  MOUSE_KEYBOARD_CONTROLS_DISABLED: false,
-
-  // Prevent the polyfill from initializing immediately. Requires the app
-  // to call InitializeWebVRPolyfill() before it can be used.
-  DEFER_INITIALIZATION: false,
-
-  // Enable the deprecated version of the API (navigator.getVRDevices).
-  ENABLE_DEPRECATED_API: false,
-
-  // Scales the recommended buffer size reported by WebVR, which can improve
-  // performance.
-  // UPDATE(2016-05-03): Setting this to 0.5 by default since 1.0 does not
-  // perform well on many mobile devices.
-  BUFFER_SCALE: 0.5,
-
-  // Allow VRDisplay.submitFrame to change gl bindings, which is more
-  // efficient if the application code will re-bind its resources on the
-  // next frame anyway. This has been seen to cause rendering glitches with
-  // THREE.js.
-  // Dirty bindings include: gl.FRAMEBUFFER_BINDING, gl.CURRENT_PROGRAM,
-  // gl.ARRAY_BUFFER_BINDING, gl.ELEMENT_ARRAY_BUFFER_BINDING,
-  // and gl.TEXTURE_BINDING_2D for texture unit 0.
-  DIRTY_SUBMIT_FRAME_BINDINGS: false
-}, window.WebVRConfig);
-
-if (!window.WebVRConfig.DEFER_INITIALIZATION) {
-  new WebVRPolyfill();
-} else {
-  window.InitializeWebVRPolyfill = function() {
-    new WebVRPolyfill();
-  }
-}
-
-},{"./util.js":10,"./webvr-polyfill.js":11}],5:[function(_dereq_,module,exports){
-/*
- * Copyright 2016 Google Inc. All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-var MathUtil = window.MathUtil || {};
-
-MathUtil.degToRad = Math.PI / 180;
-MathUtil.radToDeg = 180 / Math.PI;
-
-// Some minimal math functionality borrowed from THREE.Math and stripped down
-// for the purposes of this library.
-
-
-MathUtil.Vector2 = function ( x, y ) {
-  this.x = x || 0;
-  this.y = y || 0;
-};
-
-MathUtil.Vector2.prototype = {
-  constructor: MathUtil.Vector2,
-
-  set: function ( x, y ) {
-    this.x = x;
-    this.y = y;
-
-    return this;
-  },
-
-  copy: function ( v ) {
-    this.x = v.x;
-    this.y = v.y;
-
-    return this;
-  },
-
-  subVectors: function ( a, b ) {
-    this.x = a.x - b.x;
-    this.y = a.y - b.y;
-
-    return this;
-  },
-};
-
-MathUtil.Vector3 = function ( x, y, z ) {
-  this.x = x || 0;
-  this.y = y || 0;
-  this.z = z || 0;
-};
-
-MathUtil.Vector3.prototype = {
-  constructor: MathUtil.Vector3,
-
-  set: function ( x, y, z ) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-
-    return this;
-  },
-
-  copy: function ( v ) {
-    this.x = v.x;
-    this.y = v.y;
-    this.z = v.z;
-
-    return this;
-  },
-
-  length: function () {
-    return Math.sqrt( this.x * this.x + this.y * this.y + this.z * this.z );
-  },
-
-  normalize: function () {
-    var scalar = this.length();
-
-    if ( scalar !== 0 ) {
-      var invScalar = 1 / scalar;
-
-      this.multiplyScalar(invScalar);
-    } else {
-      this.x = 0;
-      this.y = 0;
-      this.z = 0;
-    }
-
-    return this;
-  },
-
-  multiplyScalar: function ( scalar ) {
-    this.x *= scalar;
-    this.y *= scalar;
-    this.z *= scalar;
-  },
-
-  applyQuaternion: function ( q ) {
-    var x = this.x;
-    var y = this.y;
-    var z = this.z;
-
-    var qx = q.x;
-    var qy = q.y;
-    var qz = q.z;
-    var qw = q.w;
-
-    // calculate quat * vector
-    var ix =  qw * x + qy * z - qz * y;
-    var iy =  qw * y + qz * x - qx * z;
-    var iz =  qw * z + qx * y - qy * x;
-    var iw = - qx * x - qy * y - qz * z;
-
-    // calculate result * inverse quat
-    this.x = ix * qw + iw * - qx + iy * - qz - iz * - qy;
-    this.y = iy * qw + iw * - qy + iz * - qx - ix * - qz;
-    this.z = iz * qw + iw * - qz + ix * - qy - iy * - qx;
-
-    return this;
-  },
-
-  dot: function ( v ) {
-    return this.x * v.x + this.y * v.y + this.z * v.z;
-  },
-
-  crossVectors: function ( a, b ) {
-    var ax = a.x, ay = a.y, az = a.z;
-    var bx = b.x, by = b.y, bz = b.z;
-
-    this.x = ay * bz - az * by;
-    this.y = az * bx - ax * bz;
-    this.z = ax * by - ay * bx;
-
-    return this;
-  },
-};
-
-MathUtil.Quaternion = function ( x, y, z, w ) {
-  this.x = x || 0;
-  this.y = y || 0;
-  this.z = z || 0;
-  this.w = ( w !== undefined ) ? w : 1;
-};
-
-MathUtil.Quaternion.prototype = {
-  constructor: MathUtil.Quaternion,
-
-  set: function ( x, y, z, w ) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.w = w;
-
-    return this;
-  },
-
-  copy: function ( quaternion ) {
-    this.x = quaternion.x;
-    this.y = quaternion.y;
-    this.z = quaternion.z;
-    this.w = quaternion.w;
-
-    return this;
-  },
-
-  setFromEulerXYZ: function( x, y, z ) {
-    var c1 = Math.cos( x / 2 );
-    var c2 = Math.cos( y / 2 );
-    var c3 = Math.cos( z / 2 );
-    var s1 = Math.sin( x / 2 );
-    var s2 = Math.sin( y / 2 );
-    var s3 = Math.sin( z / 2 );
-
-    this.x = s1 * c2 * c3 + c1 * s2 * s3;
-    this.y = c1 * s2 * c3 - s1 * c2 * s3;
-    this.z = c1 * c2 * s3 + s1 * s2 * c3;
-    this.w = c1 * c2 * c3 - s1 * s2 * s3;
-
-    return this;
-  },
-
-  setFromEulerYXZ: function( x, y, z ) {
-    var c1 = Math.cos( x / 2 );
-    var c2 = Math.cos( y / 2 );
-    var c3 = Math.cos( z / 2 );
-    var s1 = Math.sin( x / 2 );
-    var s2 = Math.sin( y / 2 );
-    var s3 = Math.sin( z / 2 );
-
-    this.x = s1 * c2 * c3 + c1 * s2 * s3;
-    this.y = c1 * s2 * c3 - s1 * c2 * s3;
-    this.z = c1 * c2 * s3 - s1 * s2 * c3;
-    this.w = c1 * c2 * c3 + s1 * s2 * s3;
-
-    return this;
-  },
-
-  setFromAxisAngle: function ( axis, angle ) {
-    // http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToQuaternion/index.htm
-    // assumes axis is normalized
-
-    var halfAngle = angle / 2, s = Math.sin( halfAngle );
-
-    this.x = axis.x * s;
-    this.y = axis.y * s;
-    this.z = axis.z * s;
-    this.w = Math.cos( halfAngle );
-
-    return this;
-  },
-
-  multiply: function ( q ) {
-    return this.multiplyQuaternions( this, q );
-  },
-
-  multiplyQuaternions: function ( a, b ) {
-    // from http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/code/index.htm
-
-    var qax = a.x, qay = a.y, qaz = a.z, qaw = a.w;
-    var qbx = b.x, qby = b.y, qbz = b.z, qbw = b.w;
-
-    this.x = qax * qbw + qaw * qbx + qay * qbz - qaz * qby;
-    this.y = qay * qbw + qaw * qby + qaz * qbx - qax * qbz;
-    this.z = qaz * qbw + qaw * qbz + qax * qby - qay * qbx;
-    this.w = qaw * qbw - qax * qbx - qay * qby - qaz * qbz;
-
-    return this;
-  },
-
-  inverse: function () {
-    this.x *= -1;
-    this.y *= -1;
-    this.z *= -1;
-
-    this.normalize();
-
-    return this;
-  },
-
-  normalize: function () {
-    var l = Math.sqrt( this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w );
-
-    if ( l === 0 ) {
-      this.x = 0;
-      this.y = 0;
-      this.z = 0;
-      this.w = 1;
-    } else {
-      l = 1 / l;
-
-      this.x = this.x * l;
-      this.y = this.y * l;
-      this.z = this.z * l;
-      this.w = this.w * l;
-    }
-
-    return this;
-  },
-
-  slerp: function ( qb, t ) {
-    if ( t === 0 ) return this;
-    if ( t === 1 ) return this.copy( qb );
-
-    var x = this.x, y = this.y, z = this.z, w = this.w;
-
-    // http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/
-
-    var cosHalfTheta = w * qb.w + x * qb.x + y * qb.y + z * qb.z;
-
-    if ( cosHalfTheta < 0 ) {
-      this.w = - qb.w;
-      this.x = - qb.x;
-      this.y = - qb.y;
-      this.z = - qb.z;
-
-      cosHalfTheta = - cosHalfTheta;
-    } else {
-      this.copy( qb );
-    }
-
-    if ( cosHalfTheta >= 1.0 ) {
-      this.w = w;
-      this.x = x;
-      this.y = y;
-      this.z = z;
-
-      return this;
-    }
-
-    var halfTheta = Math.acos( cosHalfTheta );
-    var sinHalfTheta = Math.sqrt( 1.0 - cosHalfTheta * cosHalfTheta );
-
-    if ( Math.abs( sinHalfTheta ) < 0.001 ) {
-      this.w = 0.5 * ( w + this.w );
-      this.x = 0.5 * ( x + this.x );
-      this.y = 0.5 * ( y + this.y );
-      this.z = 0.5 * ( z + this.z );
-
-      return this;
-    }
-
-    var ratioA = Math.sin( ( 1 - t ) * halfTheta ) / sinHalfTheta,
-    ratioB = Math.sin( t * halfTheta ) / sinHalfTheta;
-
-    this.w = ( w * ratioA + this.w * ratioB );
-    this.x = ( x * ratioA + this.x * ratioB );
-    this.y = ( y * ratioA + this.y * ratioB );
-    this.z = ( z * ratioA + this.z * ratioB );
-
-    return this;
-  },
-
-  setFromUnitVectors: function () {
-    // http://lolengine.net/blog/2014/02/24/quaternion-from-two-vectors-final
-    // assumes direction vectors vFrom and vTo are normalized
-
-    var v1, r;
-    var EPS = 0.000001;
-
-    return function ( vFrom, vTo ) {
-      if ( v1 === undefined ) v1 = new MathUtil.Vector3();
-
-      r = vFrom.dot( vTo ) + 1;
-
-      if ( r < EPS ) {
-        r = 0;
-
-        if ( Math.abs( vFrom.x ) > Math.abs( vFrom.z ) ) {
-          v1.set( - vFrom.y, vFrom.x, 0 );
-        } else {
-          v1.set( 0, - vFrom.z, vFrom.y );
-        }
-      } else {
-        v1.crossVectors( vFrom, vTo );
-      }
-
-      this.x = v1.x;
-      this.y = v1.y;
-      this.z = v1.z;
-      this.w = r;
-
-      this.normalize();
-
-      return this;
-    }
-  }(),
-};
-
-module.exports = MathUtil;
-
-},{}],6:[function(_dereq_,module,exports){
-/*
- * Copyright 2015 Google Inc. All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-var SensorSample = _dereq_('./sensor-sample.js');
-var MathUtil = _dereq_('../math-util.js');
-var Util = _dereq_('../util.js');
-
-var DEBUG = false;
-
-/**
- * An implementation of a simple complementary filter, which fuses gyroscope and
- * accelerometer data from the 'devicemotion' event.
- *
- * Accelerometer data is very noisy, but stable over the long term.
- * Gyroscope data is smooth, but tends to drift over the long term.
- *
- * This fusion is relatively simple:
- * 1. Get orientation estimates from accelerometer by applying a low-pass filter
- *    on that data.
- * 2. Get orientation estimates from gyroscope by integrating over time.
- * 3. Combine the two estimates, weighing (1) in the long term, but (2) for the
- *    short term.
- */
-function ComplementaryFilter(kFilter) {
-  this.kFilter = kFilter;
-
-  // Raw sensor measurements.
-  this.currentAccelMeasurement = new SensorSample();
-  this.currentGyroMeasurement = new SensorSample();
-  this.previousGyroMeasurement = new SensorSample();
-
-  // Set default look direction to be in the correct direction.
-  if (Util.isIOS()) {
-    this.filterQ = new MathUtil.Quaternion(-1, 0, 0, 1);
-  } else {
-    this.filterQ = new MathUtil.Quaternion(1, 0, 0, 1);
-  }
-  this.previousFilterQ = new MathUtil.Quaternion();
-  this.previousFilterQ.copy(this.filterQ);
-
-  // Orientation based on the accelerometer.
-  this.accelQ = new MathUtil.Quaternion();
-  // Whether or not the orientation has been initialized.
-  this.isOrientationInitialized = false;
-  // Running estimate of gravity based on the current orientation.
-  this.estimatedGravity = new MathUtil.Vector3();
-  // Measured gravity based on accelerometer.
-  this.measuredGravity = new MathUtil.Vector3();
-
-  // Debug only quaternion of gyro-based orientation.
-  this.gyroIntegralQ = new MathUtil.Quaternion();
-}
-
-ComplementaryFilter.prototype.addAccelMeasurement = function(vector, timestampS) {
-  this.currentAccelMeasurement.set(vector, timestampS);
-};
-
-ComplementaryFilter.prototype.addGyroMeasurement = function(vector, timestampS) {
-  this.currentGyroMeasurement.set(vector, timestampS);
-
-  var deltaT = timestampS - this.previousGyroMeasurement.timestampS;
-  if (Util.isTimestampDeltaValid(deltaT)) {
-    this.run_();
-  }
-
-  this.previousGyroMeasurement.copy(this.currentGyroMeasurement);
-};
-
-ComplementaryFilter.prototype.run_ = function() {
-
-  if (!this.isOrientationInitialized) {
-    this.accelQ = this.accelToQuaternion_(this.currentAccelMeasurement.sample);
-    this.previousFilterQ.copy(this.accelQ);
-    this.isOrientationInitialized = true;
-    return;
-  }
-
-  var deltaT = this.currentGyroMeasurement.timestampS -
-      this.previousGyroMeasurement.timestampS;
-
-  // Convert gyro rotation vector to a quaternion delta.
-  var gyroDeltaQ = this.gyroToQuaternionDelta_(this.currentGyroMeasurement.sample, deltaT);
-  this.gyroIntegralQ.multiply(gyroDeltaQ);
-
-  // filter_1 = K * (filter_0 + gyro * dT) + (1 - K) * accel.
-  this.filterQ.copy(this.previousFilterQ);
-  this.filterQ.multiply(gyroDeltaQ);
-
-  // Calculate the delta between the current estimated gravity and the real
-  // gravity vector from accelerometer.
-  var invFilterQ = new MathUtil.Quaternion();
-  invFilterQ.copy(this.filterQ);
-  invFilterQ.inverse();
-
-  this.estimatedGravity.set(0, 0, -1);
-  this.estimatedGravity.applyQuaternion(invFilterQ);
-  this.estimatedGravity.normalize();
-
-  this.measuredGravity.copy(this.currentAccelMeasurement.sample);
-  this.measuredGravity.normalize();
-
-  // Compare estimated gravity with measured gravity, get the delta quaternion
-  // between the two.
-  var deltaQ = new MathUtil.Quaternion();
-  deltaQ.setFromUnitVectors(this.estimatedGravity, this.measuredGravity);
-  deltaQ.inverse();
-
-  if (DEBUG) {
-    console.log('Delta: %d deg, G_est: (%s, %s, %s), G_meas: (%s, %s, %s)',
-                MathUtil.radToDeg * Util.getQuaternionAngle(deltaQ),
-                (this.estimatedGravity.x).toFixed(1),
-                (this.estimatedGravity.y).toFixed(1),
-                (this.estimatedGravity.z).toFixed(1),
-                (this.measuredGravity.x).toFixed(1),
-                (this.measuredGravity.y).toFixed(1),
-                (this.measuredGravity.z).toFixed(1));
-  }
-
-  // Calculate the SLERP target: current orientation plus the measured-estimated
-  // quaternion delta.
-  var targetQ = new MathUtil.Quaternion();
-  targetQ.copy(this.filterQ);
-  targetQ.multiply(deltaQ);
-
-  // SLERP factor: 0 is pure gyro, 1 is pure accel.
-  this.filterQ.slerp(targetQ, 1 - this.kFilter);
-
-  this.previousFilterQ.copy(this.filterQ);
-};
-
-ComplementaryFilter.prototype.getOrientation = function() {
-  return this.filterQ;
-};
-
-ComplementaryFilter.prototype.accelToQuaternion_ = function(accel) {
-  var normAccel = new MathUtil.Vector3();
-  normAccel.copy(accel);
-  normAccel.normalize();
-  var quat = new MathUtil.Quaternion();
-  quat.setFromUnitVectors(new MathUtil.Vector3(0, 0, -1), normAccel);
-  quat.inverse();
-  return quat;
-};
-
-ComplementaryFilter.prototype.gyroToQuaternionDelta_ = function(gyro, dt) {
-  // Extract axis and angle from the gyroscope data.
-  var quat = new MathUtil.Quaternion();
-  var axis = new MathUtil.Vector3();
-  axis.copy(gyro);
-  axis.normalize();
-  quat.setFromAxisAngle(axis, gyro.length() * dt);
-  return quat;
-};
-
-
-module.exports = ComplementaryFilter;
-
-},{"../math-util.js":5,"../util.js":10,"./sensor-sample.js":9}],7:[function(_dereq_,module,exports){
-/*
- * Copyright 2015 Google Inc. All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-var ComplementaryFilter = _dereq_('./complementary-filter.js');
-var PosePredictor = _dereq_('./pose-predictor.js');
-var MathUtil = _dereq_('../math-util.js');
-var Util = _dereq_('../util.js');
-
-/**
- * The pose sensor, implemented using DeviceMotion APIs.
- */
-function FusionPoseSensor() {
-  this.deviceId = 'webvr-polyfill:fused';
-  this.deviceName = 'VR Position Device (webvr-polyfill:fused)';
-
-  this.accelerometer = new MathUtil.Vector3();
-  this.gyroscope = new MathUtil.Vector3();
-
-  window.addEventListener('devicemotion', this.onDeviceMotionChange_.bind(this));
-  window.addEventListener('orientationchange', this.onScreenOrientationChange_.bind(this));
-
-  this.filter = new ComplementaryFilter(WebVRConfig.K_FILTER);
-  this.posePredictor = new PosePredictor(WebVRConfig.PREDICTION_TIME_S);
-
-  this.filterToWorldQ = new MathUtil.Quaternion();
-
-  // Set the filter to world transform, depending on OS.
-  if (Util.isIOS()) {
-    this.filterToWorldQ.setFromAxisAngle(new MathUtil.Vector3(1, 0, 0), Math.PI / 2);
-  } else {
-    this.filterToWorldQ.setFromAxisAngle(new MathUtil.Vector3(1, 0, 0), -Math.PI / 2);
-  }
-
-  this.inverseWorldToScreenQ = new MathUtil.Quaternion();
-  this.worldToScreenQ = new MathUtil.Quaternion();
-  this.originalPoseAdjustQ = new MathUtil.Quaternion();
-  this.originalPoseAdjustQ.setFromAxisAngle(new MathUtil.Vector3(0, 0, 1),
-                                           -window.orientation * Math.PI / 180);
-
-  this.setScreenTransform_();
-  // Adjust this filter for being in landscape mode.
-  if (Util.isLandscapeMode()) {
-    this.filterToWorldQ.multiply(this.inverseWorldToScreenQ);
-  }
-
-  // Keep track of a reset transform for resetSensor.
-  this.resetQ = new MathUtil.Quaternion();
-
-  this.isFirefoxAndroid = Util.isFirefoxAndroid();
-  this.isIOS = Util.isIOS();
-
-  this.orientationOut_ = new Float32Array(4);
-}
-
-FusionPoseSensor.prototype.getPosition = function() {
-  // This PoseSensor doesn't support position
-  return null;
-};
-
-FusionPoseSensor.prototype.getOrientation = function() {
-  // Convert from filter space to the the same system used by the
-  // deviceorientation event.
-  var orientation = this.filter.getOrientation();
-
-  // Predict orientation.
-  this.predictedQ = this.posePredictor.getPrediction(orientation, this.gyroscope, this.previousTimestampS);
-
-  // Convert to THREE coordinate system: -Z forward, Y up, X right.
-  var out = new MathUtil.Quaternion();
-  out.copy(this.filterToWorldQ);
-  out.multiply(this.resetQ);
-  out.multiply(this.predictedQ);
-  out.multiply(this.worldToScreenQ);
-
-  // Handle the yaw-only case.
-  if (WebVRConfig.YAW_ONLY) {
-    // Make a quaternion that only turns around the Y-axis.
-    out.x = 0;
-    out.z = 0;
-    out.normalize();
-  }
-
-  this.orientationOut_[0] = out.x;
-  this.orientationOut_[1] = out.y;
-  this.orientationOut_[2] = out.z;
-  this.orientationOut_[3] = out.w;
-  return this.orientationOut_;
-};
-
-FusionPoseSensor.prototype.resetPose = function() {
-  // Reduce to inverted yaw-only.
-  this.resetQ.copy(this.filter.getOrientation());
-  this.resetQ.x = 0;
-  this.resetQ.y = 0;
-  this.resetQ.z *= -1;
-  this.resetQ.normalize();
-
-  // Take into account extra transformations in landscape mode.
-  if (Util.isLandscapeMode()) {
-    this.resetQ.multiply(this.inverseWorldToScreenQ);
-  }
-
-  // Take into account original pose.
-  this.resetQ.multiply(this.originalPoseAdjustQ);
-};
-
-FusionPoseSensor.prototype.onDeviceMotionChange_ = function(deviceMotion) {
-  var accGravity = deviceMotion.accelerationIncludingGravity;
-  var rotRate = deviceMotion.rotationRate;
-  var timestampS = deviceMotion.timeStamp / 1000;
-
-  // Firefox Android timeStamp returns one thousandth of a millisecond.
-  if (this.isFirefoxAndroid) {
-    timestampS /= 1000;
-  }
-
-  var deltaS = timestampS - this.previousTimestampS;
-  if (deltaS <= Util.MIN_TIMESTEP || deltaS > Util.MAX_TIMESTEP) {
-    console.warn('Invalid timestamps detected. Time step between successive ' +
-                 'gyroscope sensor samples is very small or not monotonic');
-    this.previousTimestampS = timestampS;
-    return;
-  }
-  this.accelerometer.set(-accGravity.x, -accGravity.y, -accGravity.z);
-  this.gyroscope.set(rotRate.alpha, rotRate.beta, rotRate.gamma);
-
-  // With iOS and Firefox Android, rotationRate is reported in degrees,
-  // so we first convert to radians.
-  if (this.isIOS || this.isFirefoxAndroid) {
-    this.gyroscope.multiplyScalar(Math.PI / 180);
-  }
-
-  this.filter.addAccelMeasurement(this.accelerometer, timestampS);
-  this.filter.addGyroMeasurement(this.gyroscope, timestampS);
-
-  this.previousTimestampS = timestampS;
-};
-
-FusionPoseSensor.prototype.onScreenOrientationChange_ =
-    function(screenOrientation) {
-  this.setScreenTransform_();
-};
-
-FusionPoseSensor.prototype.setScreenTransform_ = function() {
-  this.worldToScreenQ.set(0, 0, 0, 1);
-  switch (window.orientation) {
-    case 0:
-      break;
-    case 90:
-      this.worldToScreenQ.setFromAxisAngle(new MathUtil.Vector3(0, 0, 1), -Math.PI / 2);
-      break;
-    case -90:
-      this.worldToScreenQ.setFromAxisAngle(new MathUtil.Vector3(0, 0, 1), Math.PI / 2);
-      break;
-    case 180:
-      // TODO.
-      break;
-  }
-  this.inverseWorldToScreenQ.copy(this.worldToScreenQ);
-  this.inverseWorldToScreenQ.inverse();
-};
-
-module.exports = FusionPoseSensor;
-
-},{"../math-util.js":5,"../util.js":10,"./complementary-filter.js":6,"./pose-predictor.js":8}],8:[function(_dereq_,module,exports){
-/*
- * Copyright 2015 Google Inc. All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-var MathUtil = _dereq_('../math-util.js');
-var DEBUG = false;
-
-/**
- * Given an orientation and the gyroscope data, predicts the future orientation
- * of the head. This makes rendering appear faster.
- *
- * Also see: http://msl.cs.uiuc.edu/~lavalle/papers/LavYerKatAnt14.pdf
- *
- * @param {Number} predictionTimeS time from head movement to the appearance of
- * the corresponding image.
- */
-function PosePredictor(predictionTimeS) {
-  this.predictionTimeS = predictionTimeS;
-
-  // The quaternion corresponding to the previous state.
-  this.previousQ = new MathUtil.Quaternion();
-  // Previous time a prediction occurred.
-  this.previousTimestampS = null;
-
-  // The delta quaternion that adjusts the current pose.
-  this.deltaQ = new MathUtil.Quaternion();
-  // The output quaternion.
-  this.outQ = new MathUtil.Quaternion();
-}
-
-PosePredictor.prototype.getPrediction = function(currentQ, gyro, timestampS) {
-  if (!this.previousTimestampS) {
-    this.previousQ.copy(currentQ);
-    this.previousTimestampS = timestampS;
-    return currentQ;
-  }
-
-  // Calculate axis and angle based on gyroscope rotation rate data.
-  var axis = new MathUtil.Vector3();
-  axis.copy(gyro);
-  axis.normalize();
-
-  var angularSpeed = gyro.length();
-
-  // If we're rotating slowly, don't do prediction.
-  if (angularSpeed < MathUtil.degToRad * 20) {
-    if (DEBUG) {
-      console.log('Moving slowly, at %s deg/s: no prediction',
-                  (MathUtil.radToDeg * angularSpeed).toFixed(1));
-    }
-    this.outQ.copy(currentQ);
-    this.previousQ.copy(currentQ);
-    return this.outQ;
-  }
-
-  // Get the predicted angle based on the time delta and latency.
-  var deltaT = timestampS - this.previousTimestampS;
-  var predictAngle = angularSpeed * this.predictionTimeS;
-
-  this.deltaQ.setFromAxisAngle(axis, predictAngle);
-  this.outQ.copy(this.previousQ);
-  this.outQ.multiply(this.deltaQ);
-
-  this.previousQ.copy(currentQ);
-  this.previousTimestampS = timestampS;
-
-  return this.outQ;
-};
-
-
-module.exports = PosePredictor;
-
-},{"../math-util.js":5}],9:[function(_dereq_,module,exports){
-function SensorSample(sample, timestampS) {
-  this.set(sample, timestampS);
-};
-
-SensorSample.prototype.set = function(sample, timestampS) {
-  this.sample = sample;
-  this.timestampS = timestampS;
-};
-
-SensorSample.prototype.copy = function(sensorSample) {
-  this.set(sensorSample.sample, sensorSample.timestampS);
-};
-
-module.exports = SensorSample;
-
-},{}],10:[function(_dereq_,module,exports){
-/*
- * Copyright 2015 Google Inc. All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-var objectAssign = _dereq_('object-assign');
-
-var Util = window.Util || {};
-
-Util.MIN_TIMESTEP = 0.001;
-Util.MAX_TIMESTEP = 1;
-
-Util.base64 = function(mimeType, base64) {
-  return 'data:' + mimeType + ';base64,' + base64;
-};
-
-Util.clamp = function(value, min, max) {
-  return Math.min(Math.max(min, value), max);
-};
-
-Util.lerp = function(a, b, t) {
-  return a + ((b - a) * t);
-};
-
-Util.isIOS = (function() {
-  var isIOS = /iPad|iPhone|iPod/.test(navigator.platform);
-  return function() {
-    return isIOS;
-  };
-})();
-
-Util.isSafari = (function() {
-  var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  return function() {
-    return isSafari;
-  };
-})();
-
-Util.isFirefoxAndroid = (function() {
-  var isFirefoxAndroid = navigator.userAgent.indexOf('Firefox') !== -1 &&
-      navigator.userAgent.indexOf('Android') !== -1;
-  return function() {
-    return isFirefoxAndroid;
-  };
-})();
-
-Util.isLandscapeMode = function() {
-  return (window.orientation == 90 || window.orientation == -90);
-};
-
-// Helper method to validate the time steps of sensor timestamps.
-Util.isTimestampDeltaValid = function(timestampDeltaS) {
-  if (isNaN(timestampDeltaS)) {
-    return false;
-  }
-  if (timestampDeltaS <= Util.MIN_TIMESTEP) {
-    return false;
-  }
-  if (timestampDeltaS > Util.MAX_TIMESTEP) {
-    return false;
-  }
-  return true;
-};
-
-Util.getScreenWidth = function() {
-  return Math.max(window.screen.width, window.screen.height) *
-      window.devicePixelRatio;
-};
-
-Util.getScreenHeight = function() {
-  return Math.min(window.screen.width, window.screen.height) *
-      window.devicePixelRatio;
-};
-
-Util.requestFullscreen = function(element) {
-  if (element.requestFullscreen) {
-    element.requestFullscreen();
-  } else if (element.webkitRequestFullscreen) {
-    element.webkitRequestFullscreen();
-  } else if (element.mozRequestFullScreen) {
-    element.mozRequestFullScreen();
-  } else if (element.msRequestFullscreen) {
-    element.msRequestFullscreen();
-  } else {
-    return false;
-  }
-
-  return true;
-};
-
-Util.exitFullscreen = function() {
-  if (document.exitFullscreen) {
-    document.exitFullscreen();
-  } else if (document.webkitExitFullscreen) {
-    document.webkitExitFullscreen();
-  } else if (document.mozCancelFullScreen) {
-    document.mozCancelFullScreen();
-  } else if (document.msExitFullscreen) {
-    document.msExitFullscreen();
-  } else {
-    return false;
-  }
-
-  return true;
-};
-
-Util.getFullscreenElement = function() {
-  return document.fullscreenElement ||
-      document.webkitFullscreenElement ||
-      document.mozFullScreenElement ||
-      document.msFullscreenElement;
-};
-
-Util.isMobile = function() {
-  var check = false;
-  (function(a){if(/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino/i.test(a)||/1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(a.substr(0,4)))check = true})(navigator.userAgent||navigator.vendor||window.opera);
-  return check;
-};
-
-Util.extend = objectAssign;
-
-Util.safariCssSizeWorkaround = function(canvas) {
-  // TODO(smus): Remove this workaround when Safari for iOS is fixed.
-  // iOS only workaround (for https://bugs.webkit.org/show_bug.cgi?id=152556).
-  //
-  // "To the last I grapple with thee;
-  //  from hell's heart I stab at thee;
-  //  for hate's sake I spit my last breath at thee."
-  // -- Moby Dick, by Herman Melville
-  if (Util.isIOS()) {
-    var width = canvas.style.width;
-    var height = canvas.style.height;
-    canvas.style.width = (parseInt(width) + 1) + 'px';
-    canvas.style.height = (parseInt(height)) + 'px';
-    console.log('Resetting width to...', width);
-    setTimeout(function() {
-      console.log('Done. Width is now', width);
-      canvas.style.width = width;
-      canvas.style.height = height;
-    }, 100);
-  }
-
-  // Debug only.
-  window.Util = Util;
-  window.canvas = canvas;
-};
-
-Util.frameDataFromPose = (function() {
-  var piOver180 = Math.PI / 180.0;
-  var rad45 = Math.PI * 0.25;
-
-  // Borrowed from glMatrix.
-  function mat4_perspectiveFromFieldOfView(out, fov, near, far) {
-    var upTan = Math.tan(fov ? (fov.upDegrees * piOver180) : rad45),
-    downTan = Math.tan(fov ? (fov.downDegrees * piOver180) : rad45),
-    leftTan = Math.tan(fov ? (fov.leftDegrees * piOver180) : rad45),
-    rightTan = Math.tan(fov ? (fov.rightDegrees * piOver180) : rad45),
-    xScale = 2.0 / (leftTan + rightTan),
-    yScale = 2.0 / (upTan + downTan);
-
-    out[0] = xScale;
-    out[1] = 0.0;
-    out[2] = 0.0;
-    out[3] = 0.0;
-    out[4] = 0.0;
-    out[5] = yScale;
-    out[6] = 0.0;
-    out[7] = 0.0;
-    out[8] = -((leftTan - rightTan) * xScale * 0.5);
-    out[9] = ((upTan - downTan) * yScale * 0.5);
-    out[10] = far / (near - far);
-    out[11] = -1.0;
-    out[12] = 0.0;
-    out[13] = 0.0;
-    out[14] = (far * near) / (near - far);
-    out[15] = 0.0;
-    return out;
-  }
-
-  function mat4_fromRotationTranslation(out, q, v) {
-    // Quaternion math
-    var x = q[0], y = q[1], z = q[2], w = q[3],
-        x2 = x + x,
-        y2 = y + y,
-        z2 = z + z,
-
-        xx = x * x2,
-        xy = x * y2,
-        xz = x * z2,
-        yy = y * y2,
-        yz = y * z2,
-        zz = z * z2,
-        wx = w * x2,
-        wy = w * y2,
-        wz = w * z2;
-
-    out[0] = 1 - (yy + zz);
-    out[1] = xy + wz;
-    out[2] = xz - wy;
-    out[3] = 0;
-    out[4] = xy - wz;
-    out[5] = 1 - (xx + zz);
-    out[6] = yz + wx;
-    out[7] = 0;
-    out[8] = xz + wy;
-    out[9] = yz - wx;
-    out[10] = 1 - (xx + yy);
-    out[11] = 0;
-    out[12] = v[0];
-    out[13] = v[1];
-    out[14] = v[2];
-    out[15] = 1;
-
-    return out;
-  };
-
-  function mat4_translate(out, a, v) {
-    var x = v[0], y = v[1], z = v[2],
-        a00, a01, a02, a03,
-        a10, a11, a12, a13,
-        a20, a21, a22, a23;
-
-    if (a === out) {
-      out[12] = a[0] * x + a[4] * y + a[8] * z + a[12];
-      out[13] = a[1] * x + a[5] * y + a[9] * z + a[13];
-      out[14] = a[2] * x + a[6] * y + a[10] * z + a[14];
-      out[15] = a[3] * x + a[7] * y + a[11] * z + a[15];
-    } else {
-      a00 = a[0]; a01 = a[1]; a02 = a[2]; a03 = a[3];
-      a10 = a[4]; a11 = a[5]; a12 = a[6]; a13 = a[7];
-      a20 = a[8]; a21 = a[9]; a22 = a[10]; a23 = a[11];
-
-      out[0] = a00; out[1] = a01; out[2] = a02; out[3] = a03;
-      out[4] = a10; out[5] = a11; out[6] = a12; out[7] = a13;
-      out[8] = a20; out[9] = a21; out[10] = a22; out[11] = a23;
-
-      out[12] = a00 * x + a10 * y + a20 * z + a[12];
-      out[13] = a01 * x + a11 * y + a21 * z + a[13];
-      out[14] = a02 * x + a12 * y + a22 * z + a[14];
-      out[15] = a03 * x + a13 * y + a23 * z + a[15];
-    }
-
-    return out;
-  };
-
-  mat4_invert = function(out, a) {
-    var a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
-        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
-        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
-        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
-
-        b00 = a00 * a11 - a01 * a10,
-        b01 = a00 * a12 - a02 * a10,
-        b02 = a00 * a13 - a03 * a10,
-        b03 = a01 * a12 - a02 * a11,
-        b04 = a01 * a13 - a03 * a11,
-        b05 = a02 * a13 - a03 * a12,
-        b06 = a20 * a31 - a21 * a30,
-        b07 = a20 * a32 - a22 * a30,
-        b08 = a20 * a33 - a23 * a30,
-        b09 = a21 * a32 - a22 * a31,
-        b10 = a21 * a33 - a23 * a31,
-        b11 = a22 * a33 - a23 * a32,
-
-        // Calculate the determinant
-        det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
-
-    if (!det) {
-      return null;
-    }
-    det = 1.0 / det;
-
-    out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
-    out[1] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
-    out[2] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
-    out[3] = (a22 * b04 - a21 * b05 - a23 * b03) * det;
-    out[4] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
-    out[5] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
-    out[6] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
-    out[7] = (a20 * b05 - a22 * b02 + a23 * b01) * det;
-    out[8] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
-    out[9] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
-    out[10] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
-    out[11] = (a21 * b02 - a20 * b04 - a23 * b00) * det;
-    out[12] = (a11 * b07 - a10 * b09 - a12 * b06) * det;
-    out[13] = (a00 * b09 - a01 * b07 + a02 * b06) * det;
-    out[14] = (a31 * b01 - a30 * b03 - a32 * b00) * det;
-    out[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
-
-    return out;
-  };
-
-  var defaultOrientation = new Float32Array([0, 0, 0, 1]);
-  var defaultPosition = new Float32Array([0, 0, 0]);
-
-  function updateEyeMatrices(projection, view, pose, parameters, vrDisplay) {
-    mat4_perspectiveFromFieldOfView(projection, parameters ? parameters.fieldOfView : null, vrDisplay.depthNear, vrDisplay.depthFar);
-
-    var orientation = pose.orientation || defaultOrientation;
-    var position = pose.position || defaultPosition;
-
-    mat4_fromRotationTranslation(view, orientation, position);
-    if (parameters)
-      mat4_translate(view, view, parameters.offset);
-    mat4_invert(view, view);
-  }
-
-  return function(frameData, pose, vrDisplay) {
-    if (!frameData || !pose)
-      return false;
-
-    frameData.pose = pose;
-    frameData.timestamp = pose.timestamp;
-
-    updateEyeMatrices(
-        frameData.leftProjectionMatrix, frameData.leftViewMatrix,
-        pose, vrDisplay.getEyeParameters("left"), vrDisplay);
-    updateEyeMatrices(
-        frameData.rightProjectionMatrix, frameData.rightViewMatrix,
-        pose, vrDisplay.getEyeParameters("right"), vrDisplay);
-
-    return true;
-  };
-})();
-
-module.exports = Util;
-
-},{"object-assign":1}],11:[function(_dereq_,module,exports){
-/*
- * Copyright 2015 Google Inc. All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-var Util = _dereq_('./util.js');
-var CardboardVRDisplay = _dereq_('./cardboard-vr-display.js');
-var VRDisplay = _dereq_('./base.js').VRDisplay;
-var VRFrameData = _dereq_('./base.js').VRFrameData;
-
-function WebVRPolyfill() {
-  this.displays = [];
-  this.devices = []; // For deprecated objects
-  this.devicesPopulated = false;
-  this.nativeWebVRAvailable = this.isWebVRAvailable();
-  this.nativeLegacyWebVRAvailable = this.isDeprecatedWebVRAvailable();
-
-  if (!this.nativeLegacyWebVRAvailable) {
-    if (!this.nativeWebVRAvailable) {
-      this.enablePolyfill();
-    }
-    if (WebVRConfig.ENABLE_DEPRECATED_API) {
-      this.enableDeprecatedPolyfill();
-    }
-  }
-
-  // Put a shim in place to update the API to 1.1 if needed.
-  InstallWebVRSpecShim();
-}
-
-WebVRPolyfill.prototype.isWebVRAvailable = function() {
-  return ('getVRDisplays' in navigator);
-};
-
-WebVRPolyfill.prototype.isDeprecatedWebVRAvailable = function() {
-  return ('getVRDevices' in navigator) || ('mozGetVRDevices' in navigator);
-};
-
-WebVRPolyfill.prototype.populateDevices = function() {
-  if (this.devicesPopulated) {
-    return;
-  }
-
-  // Initialize our virtual VR devices.
-  var vrDisplay = null;
-
-  // Add a Cardboard VRDisplay on compatible mobile devices
-  if (this.isCardboardCompatible()) {
-    vrDisplay = new CardboardVRDisplay();
-    this.displays.push(vrDisplay);
-  }
-
-  this.devicesPopulated = true;
-};
-
-WebVRPolyfill.prototype.enablePolyfill = function() {
-  // Provide navigator.getVRDisplays.
-  navigator.getVRDisplays = this.getVRDisplays.bind(this);
-
-  // Provide the VRDisplay object.
-  window.VRDisplay = VRDisplay;
-
-  // Provide navigator.vrEnabled.
-  var self = this;
-  Object.defineProperty(navigator, 'vrEnabled', {
-    get: function () {
-      return self.isCardboardCompatible() &&
-        (document.fullscreenEnabled ||
-          document.mozFullScreenEnabled ||
-          document.webkitFullscreenEnabled ||
-          false);
-    }
-  });
-
-  // Provide the VRFrameData object.
-  window.VRFrameData = VRFrameData;
-};
-
-WebVRPolyfill.prototype.enableDeprecatedPolyfill = function() {
-  // Provide navigator.getVRDevices.
-  navigator.getVRDevices = this.getVRDevices.bind(this);
-};
-
-WebVRPolyfill.prototype.getVRDisplays = function() {
-  this.populateDevices();
-  var displays = this.displays;
-  return new Promise(function(resolve, reject) {
-    try {
-      resolve(displays);
+      self._state = 1;
+      self._value = newValue;
+      finale(self);
     } catch (e) {
-      reject(e);
-    }
-  });
-};
-/**
- * Determine if a device is mobile.
- */
-WebVRPolyfill.prototype.isMobile = function() {
-  return /Android/i.test(navigator.userAgent) ||
-      /iPhone|iPad|iPod/i.test(navigator.userAgent);
-};
-
-WebVRPolyfill.prototype.isCardboardCompatible = function() {
-  // For now, support all iOS and Android devices.
-  // Also enable the WebVRConfig.FORCE_VR flag for debugging.
-  return this.isMobile() || WebVRConfig.FORCE_ENABLE_VR;
-};
-
-// Installs a shim that updates a WebVR 1.0 spec implementation to WebVR 1.1
-function InstallWebVRSpecShim() {
-  if ('VRDisplay' in window && !('VRFrameData' in window)) {
-    // Provide the VRFrameData object.
-    window.VRFrameData = VRFrameData;
-
-    // A lot of Chrome builds don't have depthNear and depthFar, even
-    // though they're in the WebVR 1.0 spec. Patch them in if they're not present.
-    if(!('depthNear' in window.VRDisplay.prototype)) {
-      window.VRDisplay.prototype.depthNear = 0.01;
-    }
-
-    if(!('depthFar' in window.VRDisplay.prototype)) {
-      window.VRDisplay.prototype.depthFar = 10000.0;
-    }
-
-    window.VRDisplay.prototype.getFrameData = function(frameData) {
-      return Util.frameDataFromPose(frameData, this.getPose(), this);
+      reject(self, e);
     }
   }
-};
 
-module.exports.WebVRPolyfill = WebVRPolyfill;
+  function reject(self, newValue) {
+    self._state = 2;
+    self._value = newValue;
+    finale(self);
+  }
 
-},{"./base.js":2,"./cardboard-vr-display.js":3,"./util.js":10}]},{},[4]);
+  function finale(self) {
+    if (self._state === 2 && self._deferreds.length === 0) {
+      asap(function() {
+        if (!self._handled) {
+          onUnhandledRejection(self._value);
+        }
+      });
+    }
 
-////////////////////////////////////////////////////////////////////////////////
-// start C:\Users\sean\Documents\VR\webvr-standard-monitor\src\AsyncLockRequest.js
-(function(){"use strict";
+    for (var i = 0, len = self._deferreds.length; i < len; i++) {
+      handle(self, self._deferreds[i]);
+    }
+    self._deferreds = null;
+  }
 
-function findProperty(elem, arr) {
-  for (var i = 0; i < arr.length; ++i) {
-    if (elem[arr[i]] !== undefined) {
-      return arr[i];
+  function Handler(onFulfilled, onRejected, promise) {
+    this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
+    this.onRejected = typeof onRejected === 'function' ? onRejected : null;
+    this.promise = promise;
+  }
+
+  /**
+   * Take a potentially misbehaving resolver function and make sure
+   * onFulfilled and onRejected are only called once.
+   *
+   * Makes no guarantees about asynchrony.
+   */
+  function doResolve(fn, self) {
+    var done = false;
+    try {
+      fn(function (value) {
+        if (done) return;
+        done = true;
+        resolve(self, value);
+      }, function (reason) {
+        if (done) return;
+        done = true;
+        reject(self, reason);
+      });
+    } catch (ex) {
+      if (done) return;
+      done = true;
+      reject(self, ex);
     }
   }
-}
 
-function AsyncLockRequest(name, elementOpts, changeEventOpts, errorEventOpts, requestMethodOpts, exitMethodOpts, testExtraParam) {
-  var elementName = findProperty(document, elementOpts),
-      changeEventName = findProperty(document, changeEventOpts),
-      errorEventName = findProperty(document, errorEventOpts),
-      requestMethodName = findProperty(document.documentElement, requestMethodOpts),
-      exitMethodName = findProperty(document, exitMethodOpts),
-      changeTimeout = null;
+  Promise.prototype['catch'] = function (onRejected) {
+    return this.then(null, onRejected);
+  };
 
-  changeEventName = changeEventName && changeEventName.substring(2);
-  errorEventName = errorEventName && errorEventName.substring(2);
+  Promise.prototype.then = function (onFulfilled, onRejected) {
+    var prom = new (this.constructor)(noop);
 
-  var ns = {
-    addChangeListener: function addChangeListener(thunk, bubbles) {
-      return document.addEventListener(changeEventName, thunk, bubbles);
-    },
-    removeChangeListener: function removeChangeListener(thunk) {
-      return document.removeEventListener(changeEventName, thunk);
-    },
-    addErrorListener: function addErrorListener(thunk, bubbles) {
-      return document.addEventListener(errorEventName, thunk, bubbles);
-    },
-    removeErrorListener: function removeErrorListener(thunk) {
-      return document.removeEventListener(errorEventName, thunk);
-    },
-    withChange: function withChange(act) {
-      return new Promise(function (resolve, reject) {
-        var onSuccess = function onSuccess() {
-          setTimeout(tearDown);
-          resolve(ns.element);
-        },
-            onError = function onError(evt) {
-          setTimeout(tearDown);
-          reject(evt);
-        },
-            stop = function stop() {
-          if (changeTimeout) {
-            clearTimeout(changeTimeout);
-            changeTimeout = null;
+    handle(this, new Handler(onFulfilled, onRejected, prom));
+    return prom;
+  };
+
+  Promise.all = function (arr) {
+    var args = Array.prototype.slice.call(arr);
+
+    return new Promise(function (resolve, reject) {
+      if (args.length === 0) return resolve([]);
+      var remaining = args.length;
+
+      function res(i, val) {
+        try {
+          if (val && (typeof val === 'object' || typeof val === 'function')) {
+            var then = val.then;
+            if (typeof then === 'function') {
+              then.call(val, function (val) {
+                res(i, val);
+              }, reject);
+              return;
+            }
           }
-        },
-            tearDown = function tearDown() {
-          stop();
-          ns.removeChangeListener(onSuccess);
-          ns.removeErrorListener(onError);
-        };
-
-        ns.addChangeListener(onSuccess, false);
-        ns.addErrorListener(onError, false);
-
-        if (act()) {
-          // we've already gotten lock, so don't wait for it.
-          onSuccess();
-        } else {
-          // Timeout waiting on the lock to happen, for systems like iOS that
-          // don't properly support it, even though they say they do.
-          stop();
-          changeTimeout = setTimeout(function () {
-            return onError(name + " state did not change in allotted time");
-          }, 1000);
+          args[i] = val;
+          if (--remaining === 0) {
+            resolve(args);
+          }
+        } catch (ex) {
+          reject(ex);
         }
-      });
-    },
-    request: function request(elem, extraParam) {
-      if (testExtraParam) {
-        extraParam = testExtraParam(extraParam);
       }
-      return ns.withChange(function () {
-        if (!requestMethodName) {
-          throw new Error("No " + name + " API support.");
-        } else if (ns.isActive) {
-          return true;
-        } else if (extraParam) {
-          elem[requestMethodName](extraParam);
-        } else {
-          elem[requestMethodName]();
-        }
-      });
-    },
-    exit: function exit() {
-      return ns.withChange(function () {
-        if (!exitMethodName) {
-          throw new Error("No Fullscreen API support.");
-        } else if (!ns.isActive) {
-          return true;
-        } else {
-          document[exitMethodName]();
-        }
-      });
-    }
+
+      for (var i = 0; i < args.length; i++) {
+        res(i, args[i]);
+      }
+    });
   };
 
-  Object.defineProperties(ns, {
-    element: {
-      get: function get() {
-        return document[elementName];
-      }
-    },
-    isActive: {
-      get: function get() {
-        return !!document[elementName];
-      }
-    }
-  });
-
-  return ns;
-}
-if(typeof window !== "undefined") window.AsyncLockRequest = AsyncLockRequest;
-})();
-// end C:\Users\sean\Documents\VR\webvr-standard-monitor\src\AsyncLockRequest.js
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-// start C:\Users\sean\Documents\VR\webvr-standard-monitor\src\FullScreen.js
-(function(){"use strict";
-
-var FullScreen = AsyncLockRequest("Fullscreen", ["fullscreenElement", "mozFullScreenElement", "webkitFullscreenElement", "msFullscreenElement"], ["onfullscreenchange", "onmozfullscreenchange", "onwebkitfullscreenchange", "onmsfullscreenchange"], ["onfullscreenerror", "onmozfullscreenerror", "onwebkitfullscreenerror", "onmsfullscreenerror"], ["requestFullscreen", "mozRequestFullScreen", "webkitRequestFullscreen", "webkitRequestFullScreen", "msRequestFullscreen"], ["exitFullscreen", "mozExitFullScreen", "webkitExitFullscreen", "webkitExitFullScreen", "msExitFullscreen"], function (arg) {
-  return arg || window.Element && window.Element.ALLOW_KEYBOARD_INPUT || undefined;
-});
-if(typeof window !== "undefined") window.FullScreen = FullScreen;
-})();
-// end C:\Users\sean\Documents\VR\webvr-standard-monitor\src\FullScreen.js
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-// start C:\Users\sean\Documents\VR\webvr-standard-monitor\src\Orientation.js
-(function(){"use strict";
-
-function lockOrientation(element) {
-  var type = screen.orientation && screen.orientation.type || screen.mozOrientation || "";
-  if (type.indexOf("landscape") === -1) {
-    type = "landscape-primary";
-  }
-  if (screen.orientation && screen.orientation.lock) {
-    return screen.orientation.lock(type);
-  } else if (screen.mozLockOrientation) {
-    var locked = screen.mozLockOrientation(type);
-    if (locked) {
-      return Promise.resolve(element);
-    }
-  } else {
-    return Promise.reject(new Error("Pointer lock not supported."));
-  }
-}
-
-function unlockOrientation() {
-  if (screen.orientation && screen.orientation.unlock) {
-    screen.orientation.unlock();
-  } else if (screen.mozUnlockOrientation) {
-    screen.mozUnlockOrientation();
-  }
-}
-
-var Orientation = {
-  lock: lockOrientation,
-  unlock: unlockOrientation
-};
-if(typeof window !== "undefined") window.Orientation = Orientation;
-})();
-// end C:\Users\sean\Documents\VR\webvr-standard-monitor\src\Orientation.js
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-// start C:\Users\sean\Documents\VR\webvr-standard-monitor\src\PointerLock.js
-(function(){"use strict";
-
-var PointerLock = AsyncLockRequest("Pointer Lock", ["pointerLockElement", "mozPointerLockElement", "webkitPointerLockElement"], ["onpointerlockchange", "onmozpointerlockchange", "onwebkitpointerlockchange"], ["onpointerlockerror", "onmozpointerlockerror", "onwebkitpointerlockerror"], ["requestPointerLock", "mozRequestPointerLock", "webkitRequestPointerLock", "webkitRequestPointerLock"], ["exitPointerLock", "mozExitPointerLock", "webkitExitPointerLock", "webkitExitPointerLock"]);
-if(typeof window !== "undefined") window.PointerLock = PointerLock;
-})();
-// end C:\Users\sean\Documents\VR\webvr-standard-monitor\src\PointerLock.js
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-// start C:\Users\sean\Documents\VR\webvr-standard-monitor\src\WebVRStandardMonitor.js
-(function(){"use strict";
-
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
-
-var isMobile = function (a) {
-  return (/(android|bb\d+|meego).+|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od|ad)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows (ce|phone)|xda|xiino/i.test(a) || /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(a.substring(0, 4))
-  );
-}(navigator.userAgent || navigator.vendor || window.opera),
-    heap = new WeakMap();
-
-function priv(obj, value) {
-  if (!heap.has(obj)) {
-    heap.set(obj, value || {});
-  }
-  return heap.get(obj);
-}
-
-function immutable(value) {
-  var getter = typeof value === "function" ? value : function () {
-    return value;
-  };
-  return {
-    enumerable: true,
-    get: getter,
-    set: function set() {
-      throw new Error("This value is immutable and may only be read, not written.");
-    }
-  };
-}
-
-function mutable(value, type) {
-  return {
-    enumerable: true,
-    get: function get() {
+  Promise.resolve = function (value) {
+    if (value && typeof value === 'object' && value.constructor === Promise) {
       return value;
-    },
-    set: function set(v) {
-      var t = typeof v === "undefined" ? "undefined" : _typeof(v);
-      if (t !== type) {
-        throw new Error("Value must be a " + type + ". An " + t + " was provided instead: " + v);
-      }
-      value = v;
     }
+
+    return new Promise(function (resolve) {
+      resolve(value);
+    });
   };
-}
 
-function warn(msg) {
-  return function (exp) {
-    console.warn(msg, exp);
+  Promise.reject = function (value) {
+    return new Promise(function (resolve, reject) {
+      reject(value);
+    });
   };
-}
 
-function WebVRStandardMonitor(display) {
-  if (!priv(WebVRStandardMonitor).shimSetup) {
-    priv(WebVRStandardMonitor).shimSetup = true;
-    var oldGetVRDisplays = navigator.getVRDisplays || Promise.resolve.bind(Promise, []);
-    navigator.getVRDisplays = function () {
-      return oldGetVRDisplays.call(navigator).then(function (displays) {
-        var created = false;
-        for (var i = 0; i < displays.length && !created; ++i) {
-          var dsp = displays[i];
-          created = dsp instanceof WebVRStandardMonitor;
-        }
-        if (!created) {
-          displays.unshift(new WebVRStandardMonitor(displays[0]));
-        }
-        return displays;
-      });
-    };
-  }
-
-  if (this !== window && this !== undefined) {
-    priv(this, {
-      currentLayers: [],
-      display: display
-    });
-
-    Object.defineProperties(this, {
-      capabilities: immutable(Object.defineProperties({}, {
-        hasPosition: immutable(false),
-        hasOrientation: immutable(isMobile),
-        hasExternalDisplay: immutable(false),
-        canPresent: immutable(true),
-        maxLayers: immutable(1)
-      })),
-      isPolyfilled: immutable(display && display.isPolyfilled || false),
-      displayId: immutable(0),
-      displayName: immutable(isMobile && "Magic Window" || "Standard Monitor"),
-      isConnected: immutable(true),
-      stageParameters: immutable(null),
-      isPresenting: immutable(function () {
-        return FullScreen.isActive;
-      }),
-
-      depthNear: mutable(0.01, "number"),
-      depthFar: mutable(10000.0, "number")
-    });
-  }
-}
-
-priv(WebVRStandardMonitor, {
-  shimSetup: false
-});
-
-WebVRStandardMonitor.prototype.requestAnimationFrame = window.requestAnimationFrame.bind(window);
-WebVRStandardMonitor.prototype.cancelAnimationFrame = window.cancelAnimationFrame.bind(window);
-WebVRStandardMonitor.prototype.submitFrame = function () {};
-
-function defaultPose() {
-  return {
-    position: [0, 0, 0],
-    orientation: [0, 0, 0, 1],
-    linearVelocity: null,
-    linearAcceleration: null,
-    angularVelocity: null,
-    angularAcceleration: null
-  };
-}
-
-WebVRStandardMonitor.prototype.getPose = function () {
-  var display = isMobile && priv(this).display;
-  if (display) {
-    return display.getPose();
-  } else {
-    return defaultPose();
-  }
-};
-
-WebVRStandardMonitor.prototype.getImmediatePose = function () {
-  var display = isMobile && priv(this).display;
-  if (display) {
-    return display.getImmediatePose();
-  } else {
-    return defaultPose();
-  }
-};
-
-WebVRStandardMonitor.prototype.resetPose = function () {
-  var display = isMobile && priv(this).display;
-  if (display) {
-    return display.resetPose();
-  }
-};
-
-function fireDisplayPresentChange(evt) {
-  if (!FullScreen.isActive) {
-    FullScreen.removeChangeListener(fireDisplayPresentChange);
-  }
-  window.dispatchEvent(new Event("vrdisplaypresentchange"));
-}
-
-WebVRStandardMonitor.standardFullScreenBehavior = function (elem) {
-  return FullScreen.request(elem).catch(warn("FullScreen failed")).then(WebVRStandardMonitor.standardLockBehavior);
-};
-
-WebVRStandardMonitor.standardLockBehavior = function (elem) {
-  if (isMobile) {
-    return Orientation.lock(elem).catch(warn("OrientationLock failed"));
-  } else {
-    return PointerLock.request(elem).catch(warn("PointerLock failed"));
-  }
-};
-
-WebVRStandardMonitor.standardExitFullScreenBehavior = function () {
-  return WebVRStandardMonitor.standardUnlockBehavior().then(function () {
-    return FullScreen.exit();
-  }).catch(warn("FullScreen failed"));
-};
-
-WebVRStandardMonitor.standardUnlockBehavior = function () {
-  if (isMobile) {
-    Orientation.unlock();
-    return Promise.resolve();
-  } else {
-    return PointerLock.exit().catch(warn("PointerLock exit failed"));
-  }
-};
-
-WebVRStandardMonitor.prototype.requestPresent = function (layers) {
-  for (var i = 0; i < this.capabilities.maxLayers && i < layers.length; ++i) {
-    priv(this).currentLayers[i] = layers[i];
-  }
-  var elem = layers[0].source;
-  if (isMobile) {
-    return priv(this).display.requestPresent(layers).then(function () {
-      return WebVRStandardMonitor.standardLockBehavior(elem);
-    });
-  } else {
-    FullScreen.addChangeListener(fireDisplayPresentChange);
-    return WebVRStandardMonitor.standardFullScreenBehavior(elem);
-  }
-};
-
-WebVRStandardMonitor.prototype.getLayers = function () {
-  return priv(this).currentLayers.slice();
-};
-
-WebVRStandardMonitor.prototype.exitPresent = function () {
-  var _this = priv(this);
-  _this.currentLayers.splice(0);
-
-  if (isMobile) {
-    return WebVRStandardMonitor.standardUnlockBehavior().then(function () {
-      return _this.display.exitPresent();
-    });
-  } else {
-    return WebVRStandardMonitor.standardExitFullScreenBehavior();
-  }
-};
-
-WebVRStandardMonitor.prototype.getEyeParameters = function (side) {
-  if (side === "left") {
-    var curLayer = this.getLayers()[0],
-        elem = curLayer && curLayer.source || document.body,
-        width = FullScreen.isActive ? screen.width : elem.clientWidth,
-        height = FullScreen.isActive ? screen.height : elem.clientHeight,
-        aspect = width / height,
-        vFOV = 25,
-        hFOV = vFOV * aspect;
-    return {
-      renderWidth: width * devicePixelRatio,
-      renderHeight: height * devicePixelRatio,
-      offset: new Float32Array([0, 0, 0]),
-      fieldOfView: {
-        upDegrees: vFOV,
-        downDegrees: vFOV,
-        leftDegrees: hFOV,
-        rightDegrees: hFOV
+  Promise.race = function (values) {
+    return new Promise(function (resolve, reject) {
+      for (var i = 0, len = values.length; i < len; i++) {
+        values[i].then(resolve, reject);
       }
-    };
+    });
+  };
+
+  /**
+   * Set the immediate function to execute callbacks
+   * @param fn {function} Function to execute
+   * @private
+   */
+  Promise._setImmediateFn = function _setImmediateFn(fn) {
+    asap = fn;
+  };
+
+  Promise._setUnhandledRejectionFn = function _setUnhandledRejectionFn(fn) {
+    onUnhandledRejection = fn;
+  };
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Promise;
+  } else if (!root.Promise) {
+    root.Promise = Promise;
   }
-};
-if(typeof window !== "undefined") window.WebVRStandardMonitor = WebVRStandardMonitor;
-})();
-// end C:\Users\sean\Documents\VR\webvr-standard-monitor\src\WebVRStandardMonitor.js
-////////////////////////////////////////////////////////////////////////////////
+
+})(this);
+
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
 	typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -52784,540 +52698,9 @@ THREE.OBJLoader.prototype = {
 
 };
 
-/**
- * Loads a Wavefront .mtl file specifying materials
- *
- * @author angelxuanchang
- */
-
-THREE.MTLLoader = function( manager ) {
-
-	this.manager = ( manager !== undefined ) ? manager : THREE.DefaultLoadingManager;
-
-};
-
-Object.assign( THREE.MTLLoader.prototype, THREE.EventDispatcher.prototype, {
-
-	/**
-	 * Loads and parses a MTL asset from a URL.
-	 *
-	 * @param {String} url - URL to the MTL file.
-	 * @param {Function} [onLoad] - Callback invoked with the loaded object.
-	 * @param {Function} [onProgress] - Callback for download progress.
-	 * @param {Function} [onError] - Callback for download errors.
-	 *
-	 * @see setPath setTexturePath
-	 *
-	 * @note In order for relative texture references to resolve correctly
-	 * you must call setPath and/or setTexturePath explicitly prior to load.
-	 */
-	load: function ( url, onLoad, onProgress, onError ) {
-
-		var scope = this;
-
-		var loader = new THREE.XHRLoader( this.manager );
-		loader.setPath( this.path );
-		loader.load( url, function ( text ) {
-
-			onLoad( scope.parse( text ) );
-
-		}, onProgress, onError );
-
-	},
-
-	/**
-	 * Set base path for resolving references.
-	 * If set this path will be prepended to each loaded and found reference.
-	 *
-	 * @see setTexturePath
-	 * @param {String} path
-	 *
-	 * @example
-	 *     mtlLoader.setPath( 'assets/obj/' );
-	 *     mtlLoader.load( 'my.mtl', ... );
-	 */
-	setPath: function ( path ) {
-
-		this.path = path;
-
-	},
-
-	/**
-	 * Set base path for resolving texture references.
-	 * If set this path will be prepended found texture reference.
-	 * If not set and setPath is, it will be used as texture base path.
-	 *
-	 * @see setPath
-	 * @param {String} path
-	 *
-	 * @example
-	 *     mtlLoader.setPath( 'assets/obj/' );
-	 *     mtlLoader.setTexturePath( 'assets/textures/' );
-	 *     mtlLoader.load( 'my.mtl', ... );
-	 */
-	setTexturePath: function( path ) {
-
-		this.texturePath = path;
-
-	},
-
-	setBaseUrl: function( path ) {
-
-		console.warn( 'THREE.MTLLoader: .setBaseUrl() is deprecated. Use .setTexturePath( path ) for texture path or .setPath( path ) for general base path instead.' );
-
-		this.setTexturePath( path );
-
-	},
-
-	setCrossOrigin: function ( value ) {
-
-		this.crossOrigin = value;
-
-	},
-
-	setMaterialOptions: function ( value ) {
-
-		this.materialOptions = value;
-
-	},
-
-	/**
-	 * Parses a MTL file.
-	 *
-	 * @param {String} text - Content of MTL file
-	 * @return {THREE.MTLLoader.MaterialCreator}
-	 *
-	 * @see setPath setTexturePath
-	 *
-	 * @note In order for relative texture references to resolve correctly
-	 * you must call setPath and/or setTexturePath explicitly prior to parse.
-	 */
-	parse: function ( text ) {
-
-		var lines = text.split( '\n' );
-		var info = {};
-		var delimiter_pattern = /\s+/;
-		var materialsInfo = {};
-
-		for ( var i = 0; i < lines.length; i ++ ) {
-
-			var line = lines[ i ];
-			line = line.trim();
-
-			if ( line.length === 0 || line.charAt( 0 ) === '#' ) {
-
-				// Blank line or comment ignore
-				continue;
-
-			}
-
-			var pos = line.indexOf( ' ' );
-
-			var key = ( pos >= 0 ) ? line.substring( 0, pos ) : line;
-			key = key.toLowerCase();
-
-			var value = ( pos >= 0 ) ? line.substring( pos + 1 ) : '';
-			value = value.trim();
-
-			if ( key === 'newmtl' ) {
-
-				// New material
-
-				info = { name: value };
-				materialsInfo[ value ] = info;
-
-			} else if ( info ) {
-
-				if ( key === 'ka' || key === 'kd' || key === 'ks' ) {
-
-					var ss = value.split( delimiter_pattern, 3 );
-					info[ key ] = [ parseFloat( ss[ 0 ] ), parseFloat( ss[ 1 ] ), parseFloat( ss[ 2 ] ) ];
-
-				} else {
-
-					info[ key ] = value;
-
-				}
-
-			}
-
-		}
-
-		var materialCreator = new THREE.MTLLoader.MaterialCreator( this.texturePath || this.path, this.materialOptions );
-		materialCreator.setCrossOrigin( this.crossOrigin );
-		materialCreator.setManager( this.manager );
-		materialCreator.setMaterials( materialsInfo );
-		return materialCreator;
-
-	}
-
-} );
-
-/**
- * Create a new THREE-MTLLoader.MaterialCreator
- * @param baseUrl - Url relative to which textures are loaded
- * @param options - Set of options on how to construct the materials
- *                  side: Which side to apply the material
- *                        THREE.FrontSide (default), THREE.BackSide, THREE.DoubleSide
- *                  wrap: What type of wrapping to apply for textures
- *                        THREE.RepeatWrapping (default), THREE.ClampToEdgeWrapping, THREE.MirroredRepeatWrapping
- *                  normalizeRGB: RGBs need to be normalized to 0-1 from 0-255
- *                                Default: false, assumed to be already normalized
- *                  ignoreZeroRGBs: Ignore values of RGBs (Ka,Kd,Ks) that are all 0's
- *                                  Default: false
- * @constructor
- */
-
-THREE.MTLLoader.MaterialCreator = function( baseUrl, options ) {
-
-	this.baseUrl = baseUrl || '';
-	this.options = options;
-	this.materialsInfo = {};
-	this.materials = {};
-	this.materialsArray = [];
-	this.nameLookup = {};
-
-	this.side = ( this.options && this.options.side ) ? this.options.side : THREE.FrontSide;
-	this.wrap = ( this.options && this.options.wrap ) ? this.options.wrap : THREE.RepeatWrapping;
-
-};
-
-THREE.MTLLoader.MaterialCreator.prototype = {
-
-	constructor: THREE.MTLLoader.MaterialCreator,
-
-	setCrossOrigin: function ( value ) {
-
-		this.crossOrigin = value;
-
-	},
-
-	setManager: function ( value ) {
-
-		this.manager = value;
-
-	},
-
-	setMaterials: function( materialsInfo ) {
-
-		this.materialsInfo = this.convert( materialsInfo );
-		this.materials = {};
-		this.materialsArray = [];
-		this.nameLookup = {};
-
-	},
-
-	convert: function( materialsInfo ) {
-
-		if ( ! this.options ) return materialsInfo;
-
-		var converted = {};
-
-		for ( var mn in materialsInfo ) {
-
-			// Convert materials info into normalized form based on options
-
-			var mat = materialsInfo[ mn ];
-
-			var covmat = {};
-
-			converted[ mn ] = covmat;
-
-			for ( var prop in mat ) {
-
-				var save = true;
-				var value = mat[ prop ];
-				var lprop = prop.toLowerCase();
-
-				switch ( lprop ) {
-
-					case 'kd':
-					case 'ka':
-					case 'ks':
-
-						// Diffuse color (color under white light) using RGB values
-
-						if ( this.options && this.options.normalizeRGB ) {
-
-							value = [ value[ 0 ] / 255, value[ 1 ] / 255, value[ 2 ] / 255 ];
-
-						}
-
-						if ( this.options && this.options.ignoreZeroRGBs ) {
-
-							if ( value[ 0 ] === 0 && value[ 1 ] === 0 && value[ 2 ] === 0 ) {
-
-								// ignore
-
-								save = false;
-
-							}
-
-						}
-
-						break;
-
-					default:
-
-						break;
-				}
-
-				if ( save ) {
-
-					covmat[ lprop ] = value;
-
-				}
-
-			}
-
-		}
-
-		return converted;
-
-	},
-
-	preload: function () {
-
-		for ( var mn in this.materialsInfo ) {
-
-			this.create( mn );
-
-		}
-
-	},
-
-	getIndex: function( materialName ) {
-
-		return this.nameLookup[ materialName ];
-
-	},
-
-	getAsArray: function() {
-
-		var index = 0;
-
-		for ( var mn in this.materialsInfo ) {
-
-			this.materialsArray[ index ] = this.create( mn );
-			this.nameLookup[ mn ] = index;
-			index ++;
-
-		}
-
-		return this.materialsArray;
-
-	},
-
-	create: function ( materialName ) {
-
-		if ( this.materials[ materialName ] === undefined ) {
-
-			this.createMaterial_( materialName );
-
-		}
-
-		return this.materials[ materialName ];
-
-	},
-
-	createMaterial_: function ( materialName ) {
-
-		// Create material
-
-		var scope = this;
-		var mat = this.materialsInfo[ materialName ];
-		var params = {
-
-			name: materialName,
-			side: this.side
-
-		};
-
-		var resolveURL = function ( baseUrl, url ) {
-
-			if ( typeof url !== 'string' || url === '' )
-				return '';
-
-			// Absolute URL
-			if ( /^https?:\/\//i.test( url ) ) {
-				return url;
-			}
-
-			return baseUrl + url;
-		};
-		
-		function setMapForType ( mapType, value ) {
-
-			if ( params[ mapType ] ) return; // Keep the first encountered texture
-
-			var texParams = scope.getTextureParams( value, params );
-			var map = scope.loadTexture( resolveURL( scope.baseUrl, texParams.url ) );
-			
-			map.repeat.copy( texParams.scale );
-			map.offset.copy( texParams.offset );
-
-			map.wrapS = scope.wrap;
-			map.wrapT = scope.wrap;
-			
-			params[ mapType ] = map;
-		}
-
-		for ( var prop in mat ) {
-
-			var value = mat[ prop ];
-
-			if ( value === '' ) continue;
-
-			switch ( prop.toLowerCase() ) {
-
-				// Ns is material specular exponent
-
-				case 'kd':
-
-					// Diffuse color (color under white light) using RGB values
-
-					params.color = new THREE.Color().fromArray( value );
-
-					break;
-
-				case 'ks':
-
-					// Specular color (color when light is reflected from shiny surface) using RGB values
-					params.specular = new THREE.Color().fromArray( value );
-
-					break;
-
-				case 'map_kd':
-
-					// Diffuse texture map
-
-					setMapForType( "map", value );
-
-					break;
-
-				case 'map_ks':
-
-					// Specular map
-					
-					setMapForType( "specularMap", value );
-
-					break;
-
-				case 'map_bump':
-				case 'bump':
-
-					// Bump texture map				
-					
-					setMapForType( "bumpMap", value );
-
-					break;
-
-				case 'ns':
-
-					// The specular exponent (defines the focus of the specular highlight)
-					// A high exponent results in a tight, concentrated highlight. Ns values normally range from 0 to 1000.
-
-					params.shininess = parseFloat( value );
-
-					break;
-
-				case 'd':
-
-					if ( value < 1 ) {
-
-						params.opacity = value;
-						params.transparent = true;
-
-					}
-
-					break;
-
-				case 'Tr':
-
-					if ( value > 0 ) {
-
-						params.opacity = 1 - value;
-						params.transparent = true;
-
-					}
-
-					break;
-
-				default:
-					break;
-
-			}
-
-		}
-
-		this.materials[ materialName ] = new THREE.MeshPhongMaterial( params );
-		return this.materials[ materialName ];
-	},
-
-	getTextureParams: function( value, matParams ) {
-
-		var texParams = {
-
-			scale: new THREE.Vector2( 1, 1 ),
-			offset: new THREE.Vector2( 0, 0 ),
-
-		 };
-
-		var items = value.split(/\s+/);
-		var pos;
-
-		pos = items.indexOf('-bm');
-		if (pos >= 0) {
-
-			matParams.bumpScale = parseFloat( items[pos+1] );
-			items.splice( pos, 2 );
-
-		}
-
-		pos = items.indexOf('-s');
-		if (pos >= 0) {
-
-			texParams.scale.set( parseFloat( items[pos+1] ), parseFloat( items[pos+2] ) );
-			items.splice( pos, 4 ); // we expect 3 parameters here!
-
-		}
-
-		pos = items.indexOf('-o');
-		if (pos >= 0) {
-
-			texParams.offset.set( parseFloat( items[pos+1] ), parseFloat( items[pos+2] ) );
-			items.splice( pos, 4 ); // we expect 3 parameters here!
-
-		}
-
-		texParams.url = items.join(' ').trim();
-		return texParams;
-
-	},
-
-	loadTexture: function ( url, mapping, onLoad, onProgress, onError ) {
-
-		var texture;
-		var loader = THREE.Loader.Handlers.get( url );
-		var manager = ( this.manager !== undefined ) ? this.manager : THREE.DefaultLoadingManager;
-
-		if ( loader === null ) {
-
-			loader = new THREE.TextureLoader( manager );
-
-		}
-
-		if ( loader.setCrossOrigin ) loader.setCrossOrigin( this.crossOrigin );
-		texture = loader.load( url, onLoad, onProgress, onError );
-
-		if ( mapping !== undefined ) texture.mapping = mapping;
-
-		return texture;
-
-	}
-
-};
-
+/*! npm.im/iphone-inline-video */
+var makeVideoPlayableInline=function(){"use strict";/*! npm.im/intervalometer */
+function e(e,r,n,i){function t(n){d=r(t,i),e(n-(a||n)),a=n}var d,a;return{start:function(){d||t(0)},stop:function(){n(d),d=null,a=0}}}function r(r){return e(r,requestAnimationFrame,cancelAnimationFrame)}function n(e,r,n,i){function t(r){Boolean(e[n])===Boolean(i)&&r.stopImmediatePropagation(),delete e[n]}return e.addEventListener(r,t,!1),t}function i(e,r,n,i){function t(){return n[r]}function d(e){n[r]=e}i&&d(e[r]),Object.defineProperty(e,r,{get:t,set:d})}function t(e,r,n){n.addEventListener(r,function(){return e.dispatchEvent(new Event(r))})}function d(e,r){Promise.resolve().then(function(){e.dispatchEvent(new Event(r))})}function a(e){var r=new Audio;return t(e,"play",r),t(e,"playing",r),t(e,"pause",r),r.crossOrigin=e.crossOrigin,r.src=e.src||e.currentSrc||"data:",r}function o(e,r,n){(m||0)+200<Date.now()&&(e[b]=!0,m=Date.now()),n||(e.currentTime=r),A[++k%3]=100*r|0}function u(e){return e.driver.currentTime>=e.video.duration}function s(e){var r=this;r.video.readyState>=r.video.HAVE_FUTURE_DATA?(r.hasAudio||(r.driver.currentTime=r.video.currentTime+e*r.video.playbackRate/1e3,r.video.loop&&u(r)&&(r.driver.currentTime=0)),o(r.video,r.driver.currentTime)):r.video.networkState!==r.video.NETWORK_IDLE||r.video.buffered.length||r.video.load(),r.video.ended&&(delete r.video[b],r.video.pause(!0))}function c(){var e=this,r=e[h];return e.webkitDisplayingFullscreen?void e[E]():("data:"!==r.driver.src&&r.driver.src!==e.src&&(o(e,0,!0),r.driver.src=e.src),void(e.paused&&(r.paused=!1,e.buffered.length||e.load(),r.driver.play(),r.updater.start(),r.hasAudio||(d(e,"play"),r.video.readyState>=r.video.HAVE_ENOUGH_DATA&&d(e,"playing")))))}function v(e){var r=this,n=r[h];n.driver.pause(),n.updater.stop(),r.webkitDisplayingFullscreen&&r[T](),n.paused&&!e||(n.paused=!0,n.hasAudio||d(r,"pause"),r.ended&&(r[b]=!0,d(r,"ended")))}function p(e,n){var i=e[h]={};i.paused=!0,i.hasAudio=n,i.video=e,i.updater=r(s.bind(i)),n?i.driver=a(e):(e.addEventListener("canplay",function(){e.paused||d(e,"playing")}),i.driver={src:e.src||e.currentSrc||"data:",muted:!0,paused:!0,pause:function(){i.driver.paused=!0},play:function(){i.driver.paused=!1,u(i)&&o(e,0)},get ended(){return u(i)}}),e.addEventListener("emptied",function(){var r=!i.driver.src||"data:"===i.driver.src;i.driver.src&&i.driver.src!==e.src&&(o(e,0,!0),i.driver.src=e.src,r?i.driver.play():i.updater.stop())},!1),e.addEventListener("webkitbeginfullscreen",function(){e.paused?n&&!i.driver.buffered.length&&i.driver.load():(e.pause(),e[E]())}),n&&(e.addEventListener("webkitendfullscreen",function(){i.driver.currentTime=e.currentTime}),e.addEventListener("seeking",function(){A.indexOf(100*e.currentTime|0)<0&&(i.driver.currentTime=e.currentTime)}))}function l(e){var r=e[h];e[E]=e.play,e[T]=e.pause,e.play=c,e.pause=v,i(e,"paused",r.driver),i(e,"muted",r.driver,!0),i(e,"playbackRate",r.driver,!0),i(e,"ended",r.driver),i(e,"loop",r.driver,!0),n(e,"seeking"),n(e,"seeked"),n(e,"timeupdate",b,!1),n(e,"ended",b,!1)}function f(e,r,n){void 0===r&&(r=!0),void 0===n&&(n=!0),n&&!g||e[h]||(p(e,r),l(e),e.classList.add("IIV"),!r&&e.autoplay&&e.play(),/iPhone|iPod|iPad/.test(navigator.platform)||console.warn("iphone-inline-video is not guaranteed to work in emulated environments"))}var m,y="undefined"==typeof Symbol?function(e){return"@"+(e||"@")+Math.random()}:Symbol,g=/iPhone|iPod/i.test(navigator.userAgent)&&!matchMedia("(-webkit-video-playable-inline)").matches,h=y(),b=y(),E=y("nativeplay"),T=y("nativepause"),A=[],k=0;return f.isWhitelisted=g,f}();
 /**
  * @file A fantasy name generator library.
  * @version 1.0.0
@@ -53882,6 +53265,2445 @@ NameGen.compile = function(input) {
     }
 };
 
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
+'use strict';
+/* eslint-disable no-unused-vars */
+var hasOwnProperty = Object.prototype.hasOwnProperty;
+var propIsEnumerable = Object.prototype.propertyIsEnumerable;
+
+function toObject(val) {
+	if (val === null || val === undefined) {
+		throw new TypeError('Object.assign cannot be called with null or undefined');
+	}
+
+	return Object(val);
+}
+
+function shouldUseNative() {
+	try {
+		if (!Object.assign) {
+			return false;
+		}
+
+		// Detect buggy property enumeration order in older V8 versions.
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=4118
+		var test1 = new String('abc');  // eslint-disable-line
+		test1[5] = 'de';
+		if (Object.getOwnPropertyNames(test1)[0] === '5') {
+			return false;
+		}
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
+		var test2 = {};
+		for (var i = 0; i < 10; i++) {
+			test2['_' + String.fromCharCode(i)] = i;
+		}
+		var order2 = Object.getOwnPropertyNames(test2).map(function (n) {
+			return test2[n];
+		});
+		if (order2.join('') !== '0123456789') {
+			return false;
+		}
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
+		var test3 = {};
+		'abcdefghijklmnopqrst'.split('').forEach(function (letter) {
+			test3[letter] = letter;
+		});
+		if (Object.keys(Object.assign({}, test3)).join('') !==
+				'abcdefghijklmnopqrst') {
+			return false;
+		}
+
+		return true;
+	} catch (e) {
+		// We don't expect any of the above to throw, but better to be safe.
+		return false;
+	}
+}
+
+module.exports = shouldUseNative() ? Object.assign : function (target, source) {
+	var from;
+	var to = toObject(target);
+	var symbols;
+
+	for (var s = 1; s < arguments.length; s++) {
+		from = Object(arguments[s]);
+
+		for (var key in from) {
+			if (hasOwnProperty.call(from, key)) {
+				to[key] = from[key];
+			}
+		}
+
+		if (Object.getOwnPropertySymbols) {
+			symbols = Object.getOwnPropertySymbols(from);
+			for (var i = 0; i < symbols.length; i++) {
+				if (propIsEnumerable.call(from, symbols[i])) {
+					to[symbols[i]] = from[symbols[i]];
+				}
+			}
+		}
+	}
+
+	return to;
+};
+
+},{}],2:[function(_dereq_,module,exports){
+/*
+ * Copyright 2015 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var Util = _dereq_('./util.js');
+
+// Start at a higher number to reduce chance of conflict.
+var nextDisplayId = 1000;
+var hasShowDeprecationWarning = false;
+
+var defaultLeftBounds = [0, 0, 0.5, 1];
+var defaultRightBounds = [0.5, 0, 0.5, 1];
+
+/**
+ * The base class for all VR frame data.
+ */
+
+function VRFrameData() {
+  this.leftProjectionMatrix = new Float32Array(16);
+  this.leftViewMatrix = new Float32Array(16);
+  this.rightProjectionMatrix = new Float32Array(16);
+  this.rightViewMatrix = new Float32Array(16);
+  this.pose = null;
+};
+
+/**
+ * The base class for all VR displays.
+ */
+function VRDisplay() {
+  this.isPolyfilled = true;
+  this.displayId = nextDisplayId++;
+  this.displayName = 'webvr-polyfill displayName';
+
+  this.depthNear = 0.01;
+  this.depthFar = 10000.0;
+
+  this.isConnected = true;
+  this.isPresenting = false;
+  this.capabilities = {
+    hasPosition: false,
+    hasOrientation: false,
+    hasExternalDisplay: false,
+    canPresent: false,
+    maxLayers: 1
+  };
+  this.stageParameters = null;
+
+  // "Private" members.
+  this.waitingForPresent_ = false;
+  this.layer_ = null;
+
+  this.fullscreenElement_ = null;
+  this.fullscreenWrapper_ = null;
+  this.fullscreenElementCachedStyle_ = null;
+
+  this.fullscreenEventTarget_ = null;
+  this.fullscreenChangeHandler_ = null;
+  this.fullscreenErrorHandler_ = null;
+}
+
+VRDisplay.prototype.getFrameData = function(frameData) {
+  // TODO: Technically this should retain it's value for the duration of a frame
+  // but I doubt that's practical to do in javascript.
+  return Util.frameDataFromPose(frameData, this.getPose(), this);
+};
+
+VRDisplay.prototype.getPose = function() {
+  // TODO: Technically this should retain it's value for the duration of a frame
+  // but I doubt that's practical to do in javascript.
+  return this.getImmediatePose();
+};
+
+VRDisplay.prototype.requestAnimationFrame = function(callback) {
+  return window.requestAnimationFrame(callback);
+};
+
+VRDisplay.prototype.cancelAnimationFrame = function(id) {
+  return window.cancelAnimationFrame(id);
+};
+
+VRDisplay.prototype.wrapForFullscreen = function(element) {
+  // Don't wrap in iOS.
+  if (Util.isIOS()) {
+    return element;
+  }
+  if (!this.fullscreenWrapper_) {
+    this.fullscreenWrapper_ = document.createElement('div');
+    var cssProperties = [
+      'height: ' + Math.min(screen.height, screen.width) + 'px !important',
+      'top: 0 !important',
+      'left: 0 !important',
+      'right: 0 !important',
+      'border: 0',
+      'margin: 0',
+      'padding: 0',
+      'z-index: 999999 !important',
+      'position: fixed',
+    ];
+    this.fullscreenWrapper_.setAttribute('style', cssProperties.join('; ') + ';');
+    this.fullscreenWrapper_.classList.add('webvr-polyfill-fullscreen-wrapper');
+  }
+
+  if (this.fullscreenElement_ == element) {
+    return this.fullscreenWrapper_;
+  }
+
+  // Remove any previously applied wrappers
+  this.removeFullscreenWrapper();
+
+  this.fullscreenElement_ = element;
+  var parent = this.fullscreenElement_.parentElement;
+  parent.insertBefore(this.fullscreenWrapper_, this.fullscreenElement_);
+  parent.removeChild(this.fullscreenElement_);
+  this.fullscreenWrapper_.insertBefore(this.fullscreenElement_, this.fullscreenWrapper_.firstChild);
+  this.fullscreenElementCachedStyle_ = this.fullscreenElement_.getAttribute('style');
+
+  var self = this;
+  function applyFullscreenElementStyle() {
+    if (!self.fullscreenElement_) {
+      return;
+    }
+
+    var cssProperties = [
+      'position: absolute',
+      'top: 0',
+      'left: 0',
+      'width: ' + Math.max(screen.width, screen.height) + 'px',
+      'height: ' + Math.min(screen.height, screen.width) + 'px',
+      'border: 0',
+      'margin: 0',
+      'padding: 0',
+    ];
+    self.fullscreenElement_.setAttribute('style', cssProperties.join('; ') + ';');
+  }
+
+  applyFullscreenElementStyle();
+
+  return this.fullscreenWrapper_;
+};
+
+VRDisplay.prototype.removeFullscreenWrapper = function() {
+  if (!this.fullscreenElement_) {
+    return;
+  }
+
+  var element = this.fullscreenElement_;
+  if (this.fullscreenElementCachedStyle_) {
+    element.setAttribute('style', this.fullscreenElementCachedStyle_);
+  } else {
+    element.removeAttribute('style');
+  }
+  this.fullscreenElement_ = null;
+  this.fullscreenElementCachedStyle_ = null;
+
+  var parent = this.fullscreenWrapper_.parentElement;
+  this.fullscreenWrapper_.removeChild(element);
+  parent.insertBefore(element, this.fullscreenWrapper_);
+  parent.removeChild(this.fullscreenWrapper_);
+
+  return element;
+};
+
+VRDisplay.prototype.requestPresent = function(layers) {
+  var wasPresenting = this.isPresenting;
+  var self = this;
+
+  if (!(layers instanceof Array)) {
+    if (!hasShowDeprecationWarning) {
+      console.warn("Using a deprecated form of requestPresent. Should pass in an array of VRLayers.");
+      hasShowDeprecationWarning = true;
+    }
+    layers = [layers];
+  }
+
+  return new Promise(function(resolve, reject) {
+    if (!self.capabilities.canPresent) {
+      reject(new Error('VRDisplay is not capable of presenting.'));
+      return;
+    }
+
+    if (layers.length == 0 || layers.length > self.capabilities.maxLayers) {
+      reject(new Error('Invalid number of layers.'));
+      return;
+    }
+
+    var incomingLayer = layers[0];
+    if (!incomingLayer.source) {
+      /*
+      todo: figure out the correct behavior if the source is not provided.
+      see https://github.com/w3c/webvr/issues/58
+      */
+      resolve();
+      return;
+    }
+
+    var leftBounds = incomingLayer.leftBounds || defaultLeftBounds;
+    var rightBounds = incomingLayer.rightBounds || defaultRightBounds;
+    if (wasPresenting) {
+      // Already presenting, just changing configuration
+      var changed = false;
+      var layer = self.layer_;
+      if (layer.source !== incomingLayer.source) {
+        layer.source = incomingLayer.source;
+        changed = true;
+      }
+
+      for (var i = 0; i < 4; i++) {
+        if (layer.leftBounds[i] !== leftBounds[i]) {
+          layer.leftBounds[i] = leftBounds[i];
+          changed = true;
+        }
+        if (layer.rightBounds[i] !== rightBounds[i]) {
+          layer.rightBounds[i] = rightBounds[i];
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        self.fireVRDisplayPresentChange_();
+      }
+      resolve();
+      return;
+    }
+
+    // Was not already presenting.
+    self.layer_ = {
+      predistorted: incomingLayer.predistorted,
+      source: incomingLayer.source,
+      leftBounds: leftBounds.slice(0),
+      rightBounds: rightBounds.slice(0)
+    };
+
+    self.waitingForPresent_ = false;
+    if (self.layer_ && self.layer_.source) {
+      var fullscreenElement = self.wrapForFullscreen(self.layer_.source);
+
+      function onFullscreenChange() {
+        var actualFullscreenElement = Util.getFullscreenElement();
+
+        self.isPresenting = (fullscreenElement === actualFullscreenElement);
+        if (self.isPresenting) {
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape-primary').catch(function(error){
+                    console.error('screen.orientation.lock() failed due to', error.message)
+            });
+          }
+          self.waitingForPresent_ = false;
+          self.beginPresent_();
+          resolve();
+        } else {
+          if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+          }
+          self.removeFullscreenWrapper();
+          self.endPresent_();
+          self.removeFullscreenListeners_();
+        }
+        self.fireVRDisplayPresentChange_();
+      }
+      function onFullscreenError() {
+        if (!self.waitingForPresent_) {
+          return;
+        }
+
+        self.removeFullscreenWrapper();
+        self.removeFullscreenListeners_();
+
+        self.waitingForPresent_ = false;
+        self.isPresenting = false;
+
+        reject(new Error('Unable to present.'));
+      }
+
+      self.addFullscreenListeners_(fullscreenElement,
+          onFullscreenChange, onFullscreenError);
+
+      if (Util.requestFullscreen(fullscreenElement)) {
+        self.waitingForPresent_ = true;
+      } else if (Util.isIOS()) {
+        // *sigh* Just fake it.
+        self.isPresenting = true;
+        self.beginPresent_();
+        self.fireVRDisplayPresentChange_();
+        resolve();
+      }
+    }
+
+    if (!self.waitingForPresent_ && !Util.isIOS()) {
+      Util.exitFullscreen();
+      reject(new Error('Unable to present.'));
+    }
+  });
+};
+
+VRDisplay.prototype.exitPresent = function() {
+  var wasPresenting = this.isPresenting;
+  var self = this;
+  this.isPresenting = false;
+  this.layer_ = null;
+
+  return new Promise(function(resolve, reject) {
+    if (wasPresenting) {
+      if (!Util.exitFullscreen() && Util.isIOS()) {
+        self.endPresent_();
+        self.fireVRDisplayPresentChange_();
+      }
+
+      resolve();
+    } else {
+      reject(new Error('Was not presenting to VRDisplay.'));
+    }
+  });
+};
+
+VRDisplay.prototype.getLayers = function() {
+  if (this.layer_) {
+    return [this.layer_];
+  }
+  return [];
+};
+
+VRDisplay.prototype.fireVRDisplayPresentChange_ = function() {
+  var event = new CustomEvent('vrdisplaypresentchange', {detail: {vrdisplay: this}});
+  window.dispatchEvent(event);
+};
+
+VRDisplay.prototype.addFullscreenListeners_ = function(element, changeHandler, errorHandler) {
+  this.removeFullscreenListeners_();
+
+  this.fullscreenEventTarget_ = element;
+  this.fullscreenChangeHandler_ = changeHandler;
+  this.fullscreenErrorHandler_ = errorHandler;
+
+  if (changeHandler) {
+    if (document.fullscreenEnabled) {
+      element.addEventListener('fullscreenchange', changeHandler, false);
+    } else if (document.webkitFullscreenEnabled) {
+      element.addEventListener('webkitfullscreenchange', changeHandler, false);
+    } else if (document.mozFullScreenEnabled) {
+      document.addEventListener('mozfullscreenchange', changeHandler, false);
+    } else if (document.msFullscreenEnabled) {
+      element.addEventListener('msfullscreenchange', changeHandler, false);
+    }
+  }
+
+  if (errorHandler) {
+    if (document.fullscreenEnabled) {
+      element.addEventListener('fullscreenerror', errorHandler, false);
+    } else if (document.webkitFullscreenEnabled) {
+      element.addEventListener('webkitfullscreenerror', errorHandler, false);
+    } else if (document.mozFullScreenEnabled) {
+      document.addEventListener('mozfullscreenerror', errorHandler, false);
+    } else if (document.msFullscreenEnabled) {
+      element.addEventListener('msfullscreenerror', errorHandler, false);
+    }
+  }
+};
+
+VRDisplay.prototype.removeFullscreenListeners_ = function() {
+  if (!this.fullscreenEventTarget_)
+    return;
+
+  var element = this.fullscreenEventTarget_;
+
+  if (this.fullscreenChangeHandler_) {
+    var changeHandler = this.fullscreenChangeHandler_;
+    element.removeEventListener('fullscreenchange', changeHandler, false);
+    element.removeEventListener('webkitfullscreenchange', changeHandler, false);
+    document.removeEventListener('mozfullscreenchange', changeHandler, false);
+    element.removeEventListener('msfullscreenchange', changeHandler, false);
+  }
+
+  if (this.fullscreenErrorHandler_) {
+    var errorHandler = this.fullscreenErrorHandler_;
+    element.removeEventListener('fullscreenerror', errorHandler, false);
+    element.removeEventListener('webkitfullscreenerror', errorHandler, false);
+    document.removeEventListener('mozfullscreenerror', errorHandler, false);
+    element.removeEventListener('msfullscreenerror', errorHandler, false);
+  }
+
+  this.fullscreenEventTarget_ = null;
+  this.fullscreenChangeHandler_ = null;
+  this.fullscreenErrorHandler_ = null;
+};
+
+VRDisplay.prototype.beginPresent_ = function() {
+  // Override to add custom behavior when presentation begins.
+};
+
+VRDisplay.prototype.endPresent_ = function() {
+  // Override to add custom behavior when presentation ends.
+};
+
+VRDisplay.prototype.submitFrame = function(pose) {
+  // Override to add custom behavior for frame submission.
+};
+
+VRDisplay.prototype.getEyeParameters = function(whichEye) {
+  // Override to return accurate eye parameters if canPresent is true.
+  return null;
+};
+
+/*
+ * Deprecated classes
+ */
+
+/**
+ * The base class for all VR devices. (Deprecated)
+ */
+function VRDevice() {
+  this.isPolyfilled = true;
+  this.hardwareUnitId = 'webvr-polyfill hardwareUnitId';
+  this.deviceId = 'webvr-polyfill deviceId';
+  this.deviceName = 'webvr-polyfill deviceName';
+}
+
+module.exports.VRFrameData = VRFrameData;
+module.exports.VRDisplay = VRDisplay;
+module.exports.VRDevice = VRDevice;
+
+},{"./util.js":10}],3:[function(_dereq_,module,exports){
+/*
+ * Copyright 2016 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var FusionPoseSensor = _dereq_('./sensor-fusion/fusion-pose-sensor.js');
+var VRDisplay = _dereq_('./base.js').VRDisplay;
+var Util = _dereq_('./util.js');
+
+var Eye = {
+  LEFT: 'left',
+  RIGHT: 'right'
+};
+
+/**
+ * VRDisplay based on mobile device parameters and DeviceMotion APIs.
+ */
+function CardboardVRDisplay() {
+  this.DOMElement = null;
+  this.displayName = 'Google Cardboard';
+
+  this.capabilities.hasOrientation = true;
+  this.capabilities.canPresent = true;
+
+  // "Private" members.
+  this.poseSensor_ = new FusionPoseSensor();
+
+  if (Util.isIOS()) {
+    // Listen for resize events to workaround this awful Safari bug.
+    window.addEventListener('resize', this.onResize_.bind(this));
+  }
+}
+CardboardVRDisplay.prototype = new VRDisplay();
+
+CardboardVRDisplay.prototype.getImmediatePose = function() {
+  return {
+    position: this.poseSensor_.getPosition(),
+    orientation: this.poseSensor_.getOrientation(),
+    linearVelocity: null,
+    linearAcceleration: null,
+    angularVelocity: null,
+    angularAcceleration: null
+  };
+};
+
+CardboardVRDisplay.prototype.resetPose = function() {
+  this.poseSensor_.resetPose();
+};
+
+CardboardVRDisplay.prototype.getEyeParameters = function(whichEye) {
+  var offset = [0.03, 0.0, 0.0];
+
+  if (whichEye == Eye.LEFT) {
+    offset[0] *= -1.0;
+  }
+
+  var width = screen.width,
+    height = screen.height;
+
+  if(this.DOMElement){
+    width = this.DOMElement.clientWidth;
+    height = this.DOMElement.clientHeight;
+  }
+  else if(Util.isIOS() && Util.isLandscapeMode()) {
+    var temp = width;
+    width = height;
+    height = temp;
+  }
+
+  width *= devicePixelRatio;
+  height *= devicePixelRatio;
+
+  return {
+    fieldOfView: {
+      upDegrees: 40,
+      leftDegrees: 40,
+      rightDegrees: 40,
+      downDegrees: 40
+    },
+    offset: offset,
+    renderWidth: 0.5 * width,
+    renderHeight: height,
+  };
+};
+
+CardboardVRDisplay.prototype.beginPresent_ = function() {
+  // Listen for orientation change events in order to show interstitial.
+  this.orientationHandler = this.onOrientationChange_.bind(this);
+  window.addEventListener('orientationchange', this.orientationHandler);
+};
+
+CardboardVRDisplay.prototype.endPresent_ = function() {
+  window.removeEventListener('orientationchange', this.orientationHandler);
+};
+
+CardboardVRDisplay.prototype.submitFrame = function(pose) {
+};
+
+CardboardVRDisplay.prototype.onOrientationChange_ = function(e) {
+  console.log('onOrientationChange_');
+  this.onResize_();
+};
+
+CardboardVRDisplay.prototype.onResize_ = function(e) {
+  if (this.layer_) {
+    // Size the CSS canvas.
+    // Added padding on right and bottom because iPhone 5 will not
+    // hide the URL bar unless content is bigger than the screen.
+    // This will not be visible as long as the container element (e.g. body)
+    // is set to 'overflow: hidden'.
+    var cssProperties = [
+      'position: absolute',
+      'top: 0',
+      'left: 0',
+      'width: ' + Math.max(screen.width, screen.height) + 'px',
+      'height: ' + Math.min(screen.height, screen.width) + 'px',
+      'border: 0',
+      'margin: 0'
+    ];
+    if(Util.isIOS()) {
+      cssProperties.push('padding: 0 10px 10px 0');
+    }
+    this.layer_.source.setAttribute('style', cssProperties.join('; ') + ';');
+
+    Util.safariCssSizeWorkaround(this.layer_.source);
+  }
+};
+
+module.exports = CardboardVRDisplay;
+
+},{"./base.js":2,"./sensor-fusion/fusion-pose-sensor.js":7,"./util.js":10}],4:[function(_dereq_,module,exports){
+/*
+ * Copyright 2015 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+var Util = _dereq_('./util.js');
+var WebVRPolyfill = _dereq_('./webvr-polyfill.js').WebVRPolyfill;
+
+// Initialize a WebVRConfig just in case.
+window.WebVRConfig = Util.extend({
+  // Forces availability of VR mode, even for non-mobile devices.
+  FORCE_ENABLE_VR: false,
+
+  // Complementary filter coefficient. 0 for accelerometer, 1 for gyro.
+  K_FILTER: 0.98,
+
+  // How far into the future to predict during fast motion (in seconds).
+  PREDICTION_TIME_S: 0.040,
+
+  // Flag to enable touch panner. In case you have your own touch controls.
+  TOUCH_PANNER_DISABLED: true,
+
+  // Flag to disabled the UI in VR Mode.
+  CARDBOARD_UI_DISABLED: false, // Default: false
+
+  // Flag to disable the instructions to rotate your device.
+  ROTATE_INSTRUCTIONS_DISABLED: false, // Default: false.
+
+  // Enable yaw panning only, disabling roll and pitch. This can be useful
+  // for panoramas with nothing interesting above or below.
+  YAW_ONLY: false,
+
+  // To disable keyboard and mouse controls, if you want to use your own
+  // implementation.
+  MOUSE_KEYBOARD_CONTROLS_DISABLED: false,
+
+  // Prevent the polyfill from initializing immediately. Requires the app
+  // to call InitializeWebVRPolyfill() before it can be used.
+  DEFER_INITIALIZATION: false,
+
+  // Enable the deprecated version of the API (navigator.getVRDevices).
+  ENABLE_DEPRECATED_API: false,
+
+  // Scales the recommended buffer size reported by WebVR, which can improve
+  // performance.
+  // UPDATE(2016-05-03): Setting this to 0.5 by default since 1.0 does not
+  // perform well on many mobile devices.
+  BUFFER_SCALE: 0.5,
+
+  // Allow VRDisplay.submitFrame to change gl bindings, which is more
+  // efficient if the application code will re-bind its resources on the
+  // next frame anyway. This has been seen to cause rendering glitches with
+  // THREE.js.
+  // Dirty bindings include: gl.FRAMEBUFFER_BINDING, gl.CURRENT_PROGRAM,
+  // gl.ARRAY_BUFFER_BINDING, gl.ELEMENT_ARRAY_BUFFER_BINDING,
+  // and gl.TEXTURE_BINDING_2D for texture unit 0.
+  DIRTY_SUBMIT_FRAME_BINDINGS: false
+}, window.WebVRConfig);
+
+if (!window.WebVRConfig.DEFER_INITIALIZATION) {
+  new WebVRPolyfill();
+} else {
+  window.InitializeWebVRPolyfill = function() {
+    new WebVRPolyfill();
+  }
+}
+
+},{"./util.js":10,"./webvr-polyfill.js":11}],5:[function(_dereq_,module,exports){
+/*
+ * Copyright 2016 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var MathUtil = window.MathUtil || {};
+
+MathUtil.degToRad = Math.PI / 180;
+MathUtil.radToDeg = 180 / Math.PI;
+
+// Some minimal math functionality borrowed from THREE.Math and stripped down
+// for the purposes of this library.
+
+
+MathUtil.Vector2 = function ( x, y ) {
+  this.x = x || 0;
+  this.y = y || 0;
+};
+
+MathUtil.Vector2.prototype = {
+  constructor: MathUtil.Vector2,
+
+  set: function ( x, y ) {
+    this.x = x;
+    this.y = y;
+
+    return this;
+  },
+
+  copy: function ( v ) {
+    this.x = v.x;
+    this.y = v.y;
+
+    return this;
+  },
+
+  subVectors: function ( a, b ) {
+    this.x = a.x - b.x;
+    this.y = a.y - b.y;
+
+    return this;
+  },
+};
+
+MathUtil.Vector3 = function ( x, y, z ) {
+  this.x = x || 0;
+  this.y = y || 0;
+  this.z = z || 0;
+};
+
+MathUtil.Vector3.prototype = {
+  constructor: MathUtil.Vector3,
+
+  set: function ( x, y, z ) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+
+    return this;
+  },
+
+  copy: function ( v ) {
+    this.x = v.x;
+    this.y = v.y;
+    this.z = v.z;
+
+    return this;
+  },
+
+  length: function () {
+    return Math.sqrt( this.x * this.x + this.y * this.y + this.z * this.z );
+  },
+
+  normalize: function () {
+    var scalar = this.length();
+
+    if ( scalar !== 0 ) {
+      var invScalar = 1 / scalar;
+
+      this.multiplyScalar(invScalar);
+    } else {
+      this.x = 0;
+      this.y = 0;
+      this.z = 0;
+    }
+
+    return this;
+  },
+
+  multiplyScalar: function ( scalar ) {
+    this.x *= scalar;
+    this.y *= scalar;
+    this.z *= scalar;
+  },
+
+  applyQuaternion: function ( q ) {
+    var x = this.x;
+    var y = this.y;
+    var z = this.z;
+
+    var qx = q.x;
+    var qy = q.y;
+    var qz = q.z;
+    var qw = q.w;
+
+    // calculate quat * vector
+    var ix =  qw * x + qy * z - qz * y;
+    var iy =  qw * y + qz * x - qx * z;
+    var iz =  qw * z + qx * y - qy * x;
+    var iw = - qx * x - qy * y - qz * z;
+
+    // calculate result * inverse quat
+    this.x = ix * qw + iw * - qx + iy * - qz - iz * - qy;
+    this.y = iy * qw + iw * - qy + iz * - qx - ix * - qz;
+    this.z = iz * qw + iw * - qz + ix * - qy - iy * - qx;
+
+    return this;
+  },
+
+  dot: function ( v ) {
+    return this.x * v.x + this.y * v.y + this.z * v.z;
+  },
+
+  crossVectors: function ( a, b ) {
+    var ax = a.x, ay = a.y, az = a.z;
+    var bx = b.x, by = b.y, bz = b.z;
+
+    this.x = ay * bz - az * by;
+    this.y = az * bx - ax * bz;
+    this.z = ax * by - ay * bx;
+
+    return this;
+  },
+};
+
+MathUtil.Quaternion = function ( x, y, z, w ) {
+  this.x = x || 0;
+  this.y = y || 0;
+  this.z = z || 0;
+  this.w = ( w !== undefined ) ? w : 1;
+};
+
+MathUtil.Quaternion.prototype = {
+  constructor: MathUtil.Quaternion,
+
+  set: function ( x, y, z, w ) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.w = w;
+
+    return this;
+  },
+
+  copy: function ( quaternion ) {
+    this.x = quaternion.x;
+    this.y = quaternion.y;
+    this.z = quaternion.z;
+    this.w = quaternion.w;
+
+    return this;
+  },
+
+  setFromEulerXYZ: function( x, y, z ) {
+    var c1 = Math.cos( x / 2 );
+    var c2 = Math.cos( y / 2 );
+    var c3 = Math.cos( z / 2 );
+    var s1 = Math.sin( x / 2 );
+    var s2 = Math.sin( y / 2 );
+    var s3 = Math.sin( z / 2 );
+
+    this.x = s1 * c2 * c3 + c1 * s2 * s3;
+    this.y = c1 * s2 * c3 - s1 * c2 * s3;
+    this.z = c1 * c2 * s3 + s1 * s2 * c3;
+    this.w = c1 * c2 * c3 - s1 * s2 * s3;
+
+    return this;
+  },
+
+  setFromEulerYXZ: function( x, y, z ) {
+    var c1 = Math.cos( x / 2 );
+    var c2 = Math.cos( y / 2 );
+    var c3 = Math.cos( z / 2 );
+    var s1 = Math.sin( x / 2 );
+    var s2 = Math.sin( y / 2 );
+    var s3 = Math.sin( z / 2 );
+
+    this.x = s1 * c2 * c3 + c1 * s2 * s3;
+    this.y = c1 * s2 * c3 - s1 * c2 * s3;
+    this.z = c1 * c2 * s3 - s1 * s2 * c3;
+    this.w = c1 * c2 * c3 + s1 * s2 * s3;
+
+    return this;
+  },
+
+  setFromAxisAngle: function ( axis, angle ) {
+    // http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToQuaternion/index.htm
+    // assumes axis is normalized
+
+    var halfAngle = angle / 2, s = Math.sin( halfAngle );
+
+    this.x = axis.x * s;
+    this.y = axis.y * s;
+    this.z = axis.z * s;
+    this.w = Math.cos( halfAngle );
+
+    return this;
+  },
+
+  multiply: function ( q ) {
+    return this.multiplyQuaternions( this, q );
+  },
+
+  multiplyQuaternions: function ( a, b ) {
+    // from http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/code/index.htm
+
+    var qax = a.x, qay = a.y, qaz = a.z, qaw = a.w;
+    var qbx = b.x, qby = b.y, qbz = b.z, qbw = b.w;
+
+    this.x = qax * qbw + qaw * qbx + qay * qbz - qaz * qby;
+    this.y = qay * qbw + qaw * qby + qaz * qbx - qax * qbz;
+    this.z = qaz * qbw + qaw * qbz + qax * qby - qay * qbx;
+    this.w = qaw * qbw - qax * qbx - qay * qby - qaz * qbz;
+
+    return this;
+  },
+
+  inverse: function () {
+    this.x *= -1;
+    this.y *= -1;
+    this.z *= -1;
+
+    this.normalize();
+
+    return this;
+  },
+
+  normalize: function () {
+    var l = Math.sqrt( this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w );
+
+    if ( l === 0 ) {
+      this.x = 0;
+      this.y = 0;
+      this.z = 0;
+      this.w = 1;
+    } else {
+      l = 1 / l;
+
+      this.x = this.x * l;
+      this.y = this.y * l;
+      this.z = this.z * l;
+      this.w = this.w * l;
+    }
+
+    return this;
+  },
+
+  slerp: function ( qb, t ) {
+    if ( t === 0 ) return this;
+    if ( t === 1 ) return this.copy( qb );
+
+    var x = this.x, y = this.y, z = this.z, w = this.w;
+
+    // http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/
+
+    var cosHalfTheta = w * qb.w + x * qb.x + y * qb.y + z * qb.z;
+
+    if ( cosHalfTheta < 0 ) {
+      this.w = - qb.w;
+      this.x = - qb.x;
+      this.y = - qb.y;
+      this.z = - qb.z;
+
+      cosHalfTheta = - cosHalfTheta;
+    } else {
+      this.copy( qb );
+    }
+
+    if ( cosHalfTheta >= 1.0 ) {
+      this.w = w;
+      this.x = x;
+      this.y = y;
+      this.z = z;
+
+      return this;
+    }
+
+    var halfTheta = Math.acos( cosHalfTheta );
+    var sinHalfTheta = Math.sqrt( 1.0 - cosHalfTheta * cosHalfTheta );
+
+    if ( Math.abs( sinHalfTheta ) < 0.001 ) {
+      this.w = 0.5 * ( w + this.w );
+      this.x = 0.5 * ( x + this.x );
+      this.y = 0.5 * ( y + this.y );
+      this.z = 0.5 * ( z + this.z );
+
+      return this;
+    }
+
+    var ratioA = Math.sin( ( 1 - t ) * halfTheta ) / sinHalfTheta,
+    ratioB = Math.sin( t * halfTheta ) / sinHalfTheta;
+
+    this.w = ( w * ratioA + this.w * ratioB );
+    this.x = ( x * ratioA + this.x * ratioB );
+    this.y = ( y * ratioA + this.y * ratioB );
+    this.z = ( z * ratioA + this.z * ratioB );
+
+    return this;
+  },
+
+  setFromUnitVectors: function () {
+    // http://lolengine.net/blog/2014/02/24/quaternion-from-two-vectors-final
+    // assumes direction vectors vFrom and vTo are normalized
+
+    var v1, r;
+    var EPS = 0.000001;
+
+    return function ( vFrom, vTo ) {
+      if ( v1 === undefined ) v1 = new MathUtil.Vector3();
+
+      r = vFrom.dot( vTo ) + 1;
+
+      if ( r < EPS ) {
+        r = 0;
+
+        if ( Math.abs( vFrom.x ) > Math.abs( vFrom.z ) ) {
+          v1.set( - vFrom.y, vFrom.x, 0 );
+        } else {
+          v1.set( 0, - vFrom.z, vFrom.y );
+        }
+      } else {
+        v1.crossVectors( vFrom, vTo );
+      }
+
+      this.x = v1.x;
+      this.y = v1.y;
+      this.z = v1.z;
+      this.w = r;
+
+      this.normalize();
+
+      return this;
+    }
+  }(),
+};
+
+module.exports = MathUtil;
+
+},{}],6:[function(_dereq_,module,exports){
+/*
+ * Copyright 2015 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var SensorSample = _dereq_('./sensor-sample.js');
+var MathUtil = _dereq_('../math-util.js');
+var Util = _dereq_('../util.js');
+
+var DEBUG = false;
+
+/**
+ * An implementation of a simple complementary filter, which fuses gyroscope and
+ * accelerometer data from the 'devicemotion' event.
+ *
+ * Accelerometer data is very noisy, but stable over the long term.
+ * Gyroscope data is smooth, but tends to drift over the long term.
+ *
+ * This fusion is relatively simple:
+ * 1. Get orientation estimates from accelerometer by applying a low-pass filter
+ *    on that data.
+ * 2. Get orientation estimates from gyroscope by integrating over time.
+ * 3. Combine the two estimates, weighing (1) in the long term, but (2) for the
+ *    short term.
+ */
+function ComplementaryFilter(kFilter) {
+  this.kFilter = kFilter;
+
+  // Raw sensor measurements.
+  this.currentAccelMeasurement = new SensorSample();
+  this.currentGyroMeasurement = new SensorSample();
+  this.previousGyroMeasurement = new SensorSample();
+
+  // Set default look direction to be in the correct direction.
+  if (Util.isIOS()) {
+    this.filterQ = new MathUtil.Quaternion(-1, 0, 0, 1);
+  } else {
+    this.filterQ = new MathUtil.Quaternion(1, 0, 0, 1);
+  }
+  this.previousFilterQ = new MathUtil.Quaternion();
+  this.previousFilterQ.copy(this.filterQ);
+
+  // Orientation based on the accelerometer.
+  this.accelQ = new MathUtil.Quaternion();
+  // Whether or not the orientation has been initialized.
+  this.isOrientationInitialized = false;
+  // Running estimate of gravity based on the current orientation.
+  this.estimatedGravity = new MathUtil.Vector3();
+  // Measured gravity based on accelerometer.
+  this.measuredGravity = new MathUtil.Vector3();
+
+  // Debug only quaternion of gyro-based orientation.
+  this.gyroIntegralQ = new MathUtil.Quaternion();
+}
+
+ComplementaryFilter.prototype.addAccelMeasurement = function(vector, timestampS) {
+  this.currentAccelMeasurement.set(vector, timestampS);
+};
+
+ComplementaryFilter.prototype.addGyroMeasurement = function(vector, timestampS) {
+  this.currentGyroMeasurement.set(vector, timestampS);
+
+  var deltaT = timestampS - this.previousGyroMeasurement.timestampS;
+  if (Util.isTimestampDeltaValid(deltaT)) {
+    this.run_();
+  }
+
+  this.previousGyroMeasurement.copy(this.currentGyroMeasurement);
+};
+
+ComplementaryFilter.prototype.run_ = function() {
+
+  if (!this.isOrientationInitialized) {
+    this.accelQ = this.accelToQuaternion_(this.currentAccelMeasurement.sample);
+    this.previousFilterQ.copy(this.accelQ);
+    this.isOrientationInitialized = true;
+    return;
+  }
+
+  var deltaT = this.currentGyroMeasurement.timestampS -
+      this.previousGyroMeasurement.timestampS;
+
+  // Convert gyro rotation vector to a quaternion delta.
+  var gyroDeltaQ = this.gyroToQuaternionDelta_(this.currentGyroMeasurement.sample, deltaT);
+  this.gyroIntegralQ.multiply(gyroDeltaQ);
+
+  // filter_1 = K * (filter_0 + gyro * dT) + (1 - K) * accel.
+  this.filterQ.copy(this.previousFilterQ);
+  this.filterQ.multiply(gyroDeltaQ);
+
+  // Calculate the delta between the current estimated gravity and the real
+  // gravity vector from accelerometer.
+  var invFilterQ = new MathUtil.Quaternion();
+  invFilterQ.copy(this.filterQ);
+  invFilterQ.inverse();
+
+  this.estimatedGravity.set(0, 0, -1);
+  this.estimatedGravity.applyQuaternion(invFilterQ);
+  this.estimatedGravity.normalize();
+
+  this.measuredGravity.copy(this.currentAccelMeasurement.sample);
+  this.measuredGravity.normalize();
+
+  // Compare estimated gravity with measured gravity, get the delta quaternion
+  // between the two.
+  var deltaQ = new MathUtil.Quaternion();
+  deltaQ.setFromUnitVectors(this.estimatedGravity, this.measuredGravity);
+  deltaQ.inverse();
+
+  if (DEBUG) {
+    console.log('Delta: %d deg, G_est: (%s, %s, %s), G_meas: (%s, %s, %s)',
+                MathUtil.radToDeg * Util.getQuaternionAngle(deltaQ),
+                (this.estimatedGravity.x).toFixed(1),
+                (this.estimatedGravity.y).toFixed(1),
+                (this.estimatedGravity.z).toFixed(1),
+                (this.measuredGravity.x).toFixed(1),
+                (this.measuredGravity.y).toFixed(1),
+                (this.measuredGravity.z).toFixed(1));
+  }
+
+  // Calculate the SLERP target: current orientation plus the measured-estimated
+  // quaternion delta.
+  var targetQ = new MathUtil.Quaternion();
+  targetQ.copy(this.filterQ);
+  targetQ.multiply(deltaQ);
+
+  // SLERP factor: 0 is pure gyro, 1 is pure accel.
+  this.filterQ.slerp(targetQ, 1 - this.kFilter);
+
+  this.previousFilterQ.copy(this.filterQ);
+};
+
+ComplementaryFilter.prototype.getOrientation = function() {
+  return this.filterQ;
+};
+
+ComplementaryFilter.prototype.accelToQuaternion_ = function(accel) {
+  var normAccel = new MathUtil.Vector3();
+  normAccel.copy(accel);
+  normAccel.normalize();
+  var quat = new MathUtil.Quaternion();
+  quat.setFromUnitVectors(new MathUtil.Vector3(0, 0, -1), normAccel);
+  quat.inverse();
+  return quat;
+};
+
+ComplementaryFilter.prototype.gyroToQuaternionDelta_ = function(gyro, dt) {
+  // Extract axis and angle from the gyroscope data.
+  var quat = new MathUtil.Quaternion();
+  var axis = new MathUtil.Vector3();
+  axis.copy(gyro);
+  axis.normalize();
+  quat.setFromAxisAngle(axis, gyro.length() * dt);
+  return quat;
+};
+
+
+module.exports = ComplementaryFilter;
+
+},{"../math-util.js":5,"../util.js":10,"./sensor-sample.js":9}],7:[function(_dereq_,module,exports){
+/*
+ * Copyright 2015 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+var ComplementaryFilter = _dereq_('./complementary-filter.js');
+var PosePredictor = _dereq_('./pose-predictor.js');
+var MathUtil = _dereq_('../math-util.js');
+var Util = _dereq_('../util.js');
+
+/**
+ * The pose sensor, implemented using DeviceMotion APIs.
+ */
+function FusionPoseSensor() {
+  this.deviceId = 'webvr-polyfill:fused';
+  this.deviceName = 'VR Position Device (webvr-polyfill:fused)';
+
+  this.accelerometer = new MathUtil.Vector3();
+  this.gyroscope = new MathUtil.Vector3();
+
+  window.addEventListener('devicemotion', this.onDeviceMotionChange_.bind(this));
+  window.addEventListener('orientationchange', this.onScreenOrientationChange_.bind(this));
+
+  this.filter = new ComplementaryFilter(WebVRConfig.K_FILTER);
+  this.posePredictor = new PosePredictor(WebVRConfig.PREDICTION_TIME_S);
+
+  this.filterToWorldQ = new MathUtil.Quaternion();
+
+  // Set the filter to world transform, depending on OS.
+  if (Util.isIOS()) {
+    this.filterToWorldQ.setFromAxisAngle(new MathUtil.Vector3(1, 0, 0), Math.PI / 2);
+  } else {
+    this.filterToWorldQ.setFromAxisAngle(new MathUtil.Vector3(1, 0, 0), -Math.PI / 2);
+  }
+
+  this.inverseWorldToScreenQ = new MathUtil.Quaternion();
+  this.worldToScreenQ = new MathUtil.Quaternion();
+  this.originalPoseAdjustQ = new MathUtil.Quaternion();
+  this.originalPoseAdjustQ.setFromAxisAngle(new MathUtil.Vector3(0, 0, 1),
+                                           -window.orientation * Math.PI / 180);
+
+  this.setScreenTransform_();
+  // Adjust this filter for being in landscape mode.
+  if (Util.isLandscapeMode()) {
+    this.filterToWorldQ.multiply(this.inverseWorldToScreenQ);
+  }
+
+  // Keep track of a reset transform for resetSensor.
+  this.resetQ = new MathUtil.Quaternion();
+
+  this.isFirefoxAndroid = Util.isFirefoxAndroid();
+  this.isIOS = Util.isIOS();
+
+  this.orientationOut_ = new Float32Array(4);
+}
+
+FusionPoseSensor.prototype.getPosition = function() {
+  // This PoseSensor doesn't support position
+  return null;
+};
+
+FusionPoseSensor.prototype.getOrientation = function() {
+  // Convert from filter space to the the same system used by the
+  // deviceorientation event.
+  var orientation = this.filter.getOrientation();
+
+  // Predict orientation.
+  this.predictedQ = this.posePredictor.getPrediction(orientation, this.gyroscope, this.previousTimestampS);
+
+  // Convert to THREE coordinate system: -Z forward, Y up, X right.
+  var out = new MathUtil.Quaternion();
+  out.copy(this.filterToWorldQ);
+  out.multiply(this.resetQ);
+  out.multiply(this.predictedQ);
+  out.multiply(this.worldToScreenQ);
+
+  // Handle the yaw-only case.
+  if (WebVRConfig.YAW_ONLY) {
+    // Make a quaternion that only turns around the Y-axis.
+    out.x = 0;
+    out.z = 0;
+    out.normalize();
+  }
+
+  this.orientationOut_[0] = out.x;
+  this.orientationOut_[1] = out.y;
+  this.orientationOut_[2] = out.z;
+  this.orientationOut_[3] = out.w;
+  return this.orientationOut_;
+};
+
+FusionPoseSensor.prototype.resetPose = function() {
+  // Reduce to inverted yaw-only.
+  this.resetQ.copy(this.filter.getOrientation());
+  this.resetQ.x = 0;
+  this.resetQ.y = 0;
+  this.resetQ.z *= -1;
+  this.resetQ.normalize();
+
+  // Take into account extra transformations in landscape mode.
+  if (Util.isLandscapeMode()) {
+    this.resetQ.multiply(this.inverseWorldToScreenQ);
+  }
+
+  // Take into account original pose.
+  this.resetQ.multiply(this.originalPoseAdjustQ);
+};
+
+FusionPoseSensor.prototype.onDeviceMotionChange_ = function(deviceMotion) {
+  var accGravity = deviceMotion.accelerationIncludingGravity;
+  var rotRate = deviceMotion.rotationRate;
+  var timestampS = deviceMotion.timeStamp / 1000;
+
+  // Firefox Android timeStamp returns one thousandth of a millisecond.
+  if (this.isFirefoxAndroid) {
+    timestampS /= 1000;
+  }
+
+  var deltaS = timestampS - this.previousTimestampS;
+  if (deltaS <= Util.MIN_TIMESTEP || deltaS > Util.MAX_TIMESTEP) {
+    console.warn('Invalid timestamps detected. Time step between successive ' +
+                 'gyroscope sensor samples is very small or not monotonic');
+    this.previousTimestampS = timestampS;
+    return;
+  }
+  this.accelerometer.set(-accGravity.x, -accGravity.y, -accGravity.z);
+  this.gyroscope.set(rotRate.alpha, rotRate.beta, rotRate.gamma);
+
+  // With iOS and Firefox Android, rotationRate is reported in degrees,
+  // so we first convert to radians.
+  if (this.isIOS || this.isFirefoxAndroid) {
+    this.gyroscope.multiplyScalar(Math.PI / 180);
+  }
+
+  this.filter.addAccelMeasurement(this.accelerometer, timestampS);
+  this.filter.addGyroMeasurement(this.gyroscope, timestampS);
+
+  this.previousTimestampS = timestampS;
+};
+
+FusionPoseSensor.prototype.onScreenOrientationChange_ =
+    function(screenOrientation) {
+  this.setScreenTransform_();
+};
+
+FusionPoseSensor.prototype.setScreenTransform_ = function() {
+  this.worldToScreenQ.set(0, 0, 0, 1);
+  switch (window.orientation) {
+    case 0:
+      break;
+    case 90:
+      this.worldToScreenQ.setFromAxisAngle(new MathUtil.Vector3(0, 0, 1), -Math.PI / 2);
+      break;
+    case -90:
+      this.worldToScreenQ.setFromAxisAngle(new MathUtil.Vector3(0, 0, 1), Math.PI / 2);
+      break;
+    case 180:
+      // TODO.
+      break;
+  }
+  this.inverseWorldToScreenQ.copy(this.worldToScreenQ);
+  this.inverseWorldToScreenQ.inverse();
+};
+
+module.exports = FusionPoseSensor;
+
+},{"../math-util.js":5,"../util.js":10,"./complementary-filter.js":6,"./pose-predictor.js":8}],8:[function(_dereq_,module,exports){
+/*
+ * Copyright 2015 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+var MathUtil = _dereq_('../math-util.js');
+var DEBUG = false;
+
+/**
+ * Given an orientation and the gyroscope data, predicts the future orientation
+ * of the head. This makes rendering appear faster.
+ *
+ * Also see: http://msl.cs.uiuc.edu/~lavalle/papers/LavYerKatAnt14.pdf
+ *
+ * @param {Number} predictionTimeS time from head movement to the appearance of
+ * the corresponding image.
+ */
+function PosePredictor(predictionTimeS) {
+  this.predictionTimeS = predictionTimeS;
+
+  // The quaternion corresponding to the previous state.
+  this.previousQ = new MathUtil.Quaternion();
+  // Previous time a prediction occurred.
+  this.previousTimestampS = null;
+
+  // The delta quaternion that adjusts the current pose.
+  this.deltaQ = new MathUtil.Quaternion();
+  // The output quaternion.
+  this.outQ = new MathUtil.Quaternion();
+}
+
+PosePredictor.prototype.getPrediction = function(currentQ, gyro, timestampS) {
+  if (!this.previousTimestampS) {
+    this.previousQ.copy(currentQ);
+    this.previousTimestampS = timestampS;
+    return currentQ;
+  }
+
+  // Calculate axis and angle based on gyroscope rotation rate data.
+  var axis = new MathUtil.Vector3();
+  axis.copy(gyro);
+  axis.normalize();
+
+  var angularSpeed = gyro.length();
+
+  // If we're rotating slowly, don't do prediction.
+  if (angularSpeed < MathUtil.degToRad * 20) {
+    if (DEBUG) {
+      console.log('Moving slowly, at %s deg/s: no prediction',
+                  (MathUtil.radToDeg * angularSpeed).toFixed(1));
+    }
+    this.outQ.copy(currentQ);
+    this.previousQ.copy(currentQ);
+    return this.outQ;
+  }
+
+  // Get the predicted angle based on the time delta and latency.
+  var deltaT = timestampS - this.previousTimestampS;
+  var predictAngle = angularSpeed * this.predictionTimeS;
+
+  this.deltaQ.setFromAxisAngle(axis, predictAngle);
+  this.outQ.copy(this.previousQ);
+  this.outQ.multiply(this.deltaQ);
+
+  this.previousQ.copy(currentQ);
+  this.previousTimestampS = timestampS;
+
+  return this.outQ;
+};
+
+
+module.exports = PosePredictor;
+
+},{"../math-util.js":5}],9:[function(_dereq_,module,exports){
+function SensorSample(sample, timestampS) {
+  this.set(sample, timestampS);
+};
+
+SensorSample.prototype.set = function(sample, timestampS) {
+  this.sample = sample;
+  this.timestampS = timestampS;
+};
+
+SensorSample.prototype.copy = function(sensorSample) {
+  this.set(sensorSample.sample, sensorSample.timestampS);
+};
+
+module.exports = SensorSample;
+
+},{}],10:[function(_dereq_,module,exports){
+/*
+ * Copyright 2015 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var objectAssign = _dereq_('object-assign');
+
+var Util = window.Util || {};
+
+Util.MIN_TIMESTEP = 0.001;
+Util.MAX_TIMESTEP = 1;
+
+Util.base64 = function(mimeType, base64) {
+  return 'data:' + mimeType + ';base64,' + base64;
+};
+
+Util.clamp = function(value, min, max) {
+  return Math.min(Math.max(min, value), max);
+};
+
+Util.lerp = function(a, b, t) {
+  return a + ((b - a) * t);
+};
+
+Util.isIOS = (function() {
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.platform);
+  return function() {
+    return isIOS;
+  };
+})();
+
+Util.isSafari = (function() {
+  var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  return function() {
+    return isSafari;
+  };
+})();
+
+Util.isFirefoxAndroid = (function() {
+  var isFirefoxAndroid = navigator.userAgent.indexOf('Firefox') !== -1 &&
+      navigator.userAgent.indexOf('Android') !== -1;
+  return function() {
+    return isFirefoxAndroid;
+  };
+})();
+
+Util.isLandscapeMode = function() {
+  return (window.orientation == 90 || window.orientation == -90);
+};
+
+// Helper method to validate the time steps of sensor timestamps.
+Util.isTimestampDeltaValid = function(timestampDeltaS) {
+  if (isNaN(timestampDeltaS)) {
+    return false;
+  }
+  if (timestampDeltaS <= Util.MIN_TIMESTEP) {
+    return false;
+  }
+  if (timestampDeltaS > Util.MAX_TIMESTEP) {
+    return false;
+  }
+  return true;
+};
+
+Util.getScreenWidth = function() {
+  return Math.max(window.screen.width, window.screen.height) *
+      window.devicePixelRatio;
+};
+
+Util.getScreenHeight = function() {
+  return Math.min(window.screen.width, window.screen.height) *
+      window.devicePixelRatio;
+};
+
+Util.requestFullscreen = function(element) {
+  if (element.requestFullscreen) {
+    element.requestFullscreen();
+  } else if (element.webkitRequestFullscreen) {
+    element.webkitRequestFullscreen();
+  } else if (element.mozRequestFullScreen) {
+    element.mozRequestFullScreen();
+  } else if (element.msRequestFullscreen) {
+    element.msRequestFullscreen();
+  } else {
+    return false;
+  }
+
+  return true;
+};
+
+Util.exitFullscreen = function() {
+  if (document.exitFullscreen) {
+    document.exitFullscreen();
+  } else if (document.webkitExitFullscreen) {
+    document.webkitExitFullscreen();
+  } else if (document.mozCancelFullScreen) {
+    document.mozCancelFullScreen();
+  } else if (document.msExitFullscreen) {
+    document.msExitFullscreen();
+  } else {
+    return false;
+  }
+
+  return true;
+};
+
+Util.getFullscreenElement = function() {
+  return document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement;
+};
+
+Util.isMobile = function() {
+  var check = false;
+  (function(a){if(/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino/i.test(a)||/1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(a.substr(0,4)))check = true})(navigator.userAgent||navigator.vendor||window.opera);
+  return check;
+};
+
+Util.extend = objectAssign;
+
+Util.safariCssSizeWorkaround = function(canvas) {
+  // TODO(smus): Remove this workaround when Safari for iOS is fixed.
+  // iOS only workaround (for https://bugs.webkit.org/show_bug.cgi?id=152556).
+  //
+  // "To the last I grapple with thee;
+  //  from hell's heart I stab at thee;
+  //  for hate's sake I spit my last breath at thee."
+  // -- Moby Dick, by Herman Melville
+  if (Util.isIOS()) {
+    var width = canvas.style.width;
+    var height = canvas.style.height;
+    canvas.style.width = (parseInt(width) + 1) + 'px';
+    canvas.style.height = (parseInt(height)) + 'px';
+    console.log('Resetting width to...', width);
+    setTimeout(function() {
+      console.log('Done. Width is now', width);
+      canvas.style.width = width;
+      canvas.style.height = height;
+    }, 100);
+  }
+
+  // Debug only.
+  window.Util = Util;
+  window.canvas = canvas;
+};
+
+Util.frameDataFromPose = (function() {
+  var piOver180 = Math.PI / 180.0;
+  var rad45 = Math.PI * 0.25;
+
+  // Borrowed from glMatrix.
+  function mat4_perspectiveFromFieldOfView(out, fov, near, far) {
+    var upTan = Math.tan(fov ? (fov.upDegrees * piOver180) : rad45),
+    downTan = Math.tan(fov ? (fov.downDegrees * piOver180) : rad45),
+    leftTan = Math.tan(fov ? (fov.leftDegrees * piOver180) : rad45),
+    rightTan = Math.tan(fov ? (fov.rightDegrees * piOver180) : rad45),
+    xScale = 2.0 / (leftTan + rightTan),
+    yScale = 2.0 / (upTan + downTan);
+
+    out[0] = xScale;
+    out[1] = 0.0;
+    out[2] = 0.0;
+    out[3] = 0.0;
+    out[4] = 0.0;
+    out[5] = yScale;
+    out[6] = 0.0;
+    out[7] = 0.0;
+    out[8] = -((leftTan - rightTan) * xScale * 0.5);
+    out[9] = ((upTan - downTan) * yScale * 0.5);
+    out[10] = far / (near - far);
+    out[11] = -1.0;
+    out[12] = 0.0;
+    out[13] = 0.0;
+    out[14] = (far * near) / (near - far);
+    out[15] = 0.0;
+    return out;
+  }
+
+  function mat4_fromRotationTranslation(out, q, v) {
+    // Quaternion math
+    var x = q[0], y = q[1], z = q[2], w = q[3],
+        x2 = x + x,
+        y2 = y + y,
+        z2 = z + z,
+
+        xx = x * x2,
+        xy = x * y2,
+        xz = x * z2,
+        yy = y * y2,
+        yz = y * z2,
+        zz = z * z2,
+        wx = w * x2,
+        wy = w * y2,
+        wz = w * z2;
+
+    out[0] = 1 - (yy + zz);
+    out[1] = xy + wz;
+    out[2] = xz - wy;
+    out[3] = 0;
+    out[4] = xy - wz;
+    out[5] = 1 - (xx + zz);
+    out[6] = yz + wx;
+    out[7] = 0;
+    out[8] = xz + wy;
+    out[9] = yz - wx;
+    out[10] = 1 - (xx + yy);
+    out[11] = 0;
+    out[12] = v[0];
+    out[13] = v[1];
+    out[14] = v[2];
+    out[15] = 1;
+
+    return out;
+  };
+
+  function mat4_translate(out, a, v) {
+    var x = v[0], y = v[1], z = v[2],
+        a00, a01, a02, a03,
+        a10, a11, a12, a13,
+        a20, a21, a22, a23;
+
+    if (a === out) {
+      out[12] = a[0] * x + a[4] * y + a[8] * z + a[12];
+      out[13] = a[1] * x + a[5] * y + a[9] * z + a[13];
+      out[14] = a[2] * x + a[6] * y + a[10] * z + a[14];
+      out[15] = a[3] * x + a[7] * y + a[11] * z + a[15];
+    } else {
+      a00 = a[0]; a01 = a[1]; a02 = a[2]; a03 = a[3];
+      a10 = a[4]; a11 = a[5]; a12 = a[6]; a13 = a[7];
+      a20 = a[8]; a21 = a[9]; a22 = a[10]; a23 = a[11];
+
+      out[0] = a00; out[1] = a01; out[2] = a02; out[3] = a03;
+      out[4] = a10; out[5] = a11; out[6] = a12; out[7] = a13;
+      out[8] = a20; out[9] = a21; out[10] = a22; out[11] = a23;
+
+      out[12] = a00 * x + a10 * y + a20 * z + a[12];
+      out[13] = a01 * x + a11 * y + a21 * z + a[13];
+      out[14] = a02 * x + a12 * y + a22 * z + a[14];
+      out[15] = a03 * x + a13 * y + a23 * z + a[15];
+    }
+
+    return out;
+  };
+
+  mat4_invert = function(out, a) {
+    var a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
+        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
+        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
+        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
+
+        b00 = a00 * a11 - a01 * a10,
+        b01 = a00 * a12 - a02 * a10,
+        b02 = a00 * a13 - a03 * a10,
+        b03 = a01 * a12 - a02 * a11,
+        b04 = a01 * a13 - a03 * a11,
+        b05 = a02 * a13 - a03 * a12,
+        b06 = a20 * a31 - a21 * a30,
+        b07 = a20 * a32 - a22 * a30,
+        b08 = a20 * a33 - a23 * a30,
+        b09 = a21 * a32 - a22 * a31,
+        b10 = a21 * a33 - a23 * a31,
+        b11 = a22 * a33 - a23 * a32,
+
+        // Calculate the determinant
+        det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+
+    if (!det) {
+      return null;
+    }
+    det = 1.0 / det;
+
+    out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
+    out[1] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
+    out[2] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
+    out[3] = (a22 * b04 - a21 * b05 - a23 * b03) * det;
+    out[4] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
+    out[5] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
+    out[6] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
+    out[7] = (a20 * b05 - a22 * b02 + a23 * b01) * det;
+    out[8] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
+    out[9] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+    out[10] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
+    out[11] = (a21 * b02 - a20 * b04 - a23 * b00) * det;
+    out[12] = (a11 * b07 - a10 * b09 - a12 * b06) * det;
+    out[13] = (a00 * b09 - a01 * b07 + a02 * b06) * det;
+    out[14] = (a31 * b01 - a30 * b03 - a32 * b00) * det;
+    out[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
+
+    return out;
+  };
+
+  var defaultOrientation = new Float32Array([0, 0, 0, 1]);
+  var defaultPosition = new Float32Array([0, 0, 0]);
+
+  function updateEyeMatrices(projection, view, pose, parameters, vrDisplay) {
+    mat4_perspectiveFromFieldOfView(projection, parameters ? parameters.fieldOfView : null, vrDisplay.depthNear, vrDisplay.depthFar);
+
+    var orientation = pose.orientation || defaultOrientation;
+    var position = pose.position || defaultPosition;
+
+    mat4_fromRotationTranslation(view, orientation, position);
+    if (parameters)
+      mat4_translate(view, view, parameters.offset);
+    mat4_invert(view, view);
+  }
+
+  return function(frameData, pose, vrDisplay) {
+    if (!frameData || !pose)
+      return false;
+
+    frameData.pose = pose;
+    frameData.timestamp = pose.timestamp;
+
+    updateEyeMatrices(
+        frameData.leftProjectionMatrix, frameData.leftViewMatrix,
+        pose, vrDisplay.getEyeParameters("left"), vrDisplay);
+    updateEyeMatrices(
+        frameData.rightProjectionMatrix, frameData.rightViewMatrix,
+        pose, vrDisplay.getEyeParameters("right"), vrDisplay);
+
+    return true;
+  };
+})();
+
+module.exports = Util;
+
+},{"object-assign":1}],11:[function(_dereq_,module,exports){
+/*
+ * Copyright 2015 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var Util = _dereq_('./util.js');
+var CardboardVRDisplay = _dereq_('./cardboard-vr-display.js');
+var VRDisplay = _dereq_('./base.js').VRDisplay;
+var VRFrameData = _dereq_('./base.js').VRFrameData;
+
+function WebVRPolyfill() {
+  this.displays = [];
+  this.devices = []; // For deprecated objects
+  this.devicesPopulated = false;
+  this.nativeWebVRAvailable = this.isWebVRAvailable();
+  this.nativeLegacyWebVRAvailable = this.isDeprecatedWebVRAvailable();
+
+  if (!this.nativeLegacyWebVRAvailable) {
+    if (!this.nativeWebVRAvailable) {
+      this.enablePolyfill();
+    }
+    if (WebVRConfig.ENABLE_DEPRECATED_API) {
+      this.enableDeprecatedPolyfill();
+    }
+  }
+
+  // Put a shim in place to update the API to 1.1 if needed.
+  InstallWebVRSpecShim();
+}
+
+WebVRPolyfill.prototype.isWebVRAvailable = function() {
+  return ('getVRDisplays' in navigator);
+};
+
+WebVRPolyfill.prototype.isDeprecatedWebVRAvailable = function() {
+  return ('getVRDevices' in navigator) || ('mozGetVRDevices' in navigator);
+};
+
+WebVRPolyfill.prototype.populateDevices = function() {
+  if (this.devicesPopulated) {
+    return;
+  }
+
+  // Initialize our virtual VR devices.
+  var vrDisplay = null;
+
+  // Add a Cardboard VRDisplay on compatible mobile devices
+  if (this.isCardboardCompatible()) {
+    vrDisplay = new CardboardVRDisplay();
+    this.displays.push(vrDisplay);
+  }
+
+  this.devicesPopulated = true;
+};
+
+WebVRPolyfill.prototype.enablePolyfill = function() {
+  // Provide navigator.getVRDisplays.
+  navigator.getVRDisplays = this.getVRDisplays.bind(this);
+
+  // Provide the VRDisplay object.
+  window.VRDisplay = VRDisplay;
+
+  // Provide navigator.vrEnabled.
+  var self = this;
+  Object.defineProperty(navigator, 'vrEnabled', {
+    get: function () {
+      return self.isCardboardCompatible() &&
+        (document.fullscreenEnabled ||
+          document.mozFullScreenEnabled ||
+          document.webkitFullscreenEnabled ||
+          false);
+    }
+  });
+
+  // Provide the VRFrameData object.
+  window.VRFrameData = VRFrameData;
+};
+
+WebVRPolyfill.prototype.enableDeprecatedPolyfill = function() {
+  // Provide navigator.getVRDevices.
+  navigator.getVRDevices = this.getVRDevices.bind(this);
+};
+
+WebVRPolyfill.prototype.getVRDisplays = function() {
+  this.populateDevices();
+  var displays = this.displays;
+  return new Promise(function(resolve, reject) {
+    try {
+      resolve(displays);
+    } catch (e) {
+      reject(e);
+    }
+  });
+};
+/**
+ * Determine if a device is mobile.
+ */
+WebVRPolyfill.prototype.isMobile = function() {
+  return /Android/i.test(navigator.userAgent) ||
+      /iPhone|iPad|iPod/i.test(navigator.userAgent);
+};
+
+WebVRPolyfill.prototype.isCardboardCompatible = function() {
+  // For now, support all iOS and Android devices.
+  // Also enable the WebVRConfig.FORCE_VR flag for debugging.
+  return this.isMobile() || WebVRConfig.FORCE_ENABLE_VR;
+};
+
+// Installs a shim that updates a WebVR 1.0 spec implementation to WebVR 1.1
+function InstallWebVRSpecShim() {
+  if ('VRDisplay' in window && !('VRFrameData' in window)) {
+    // Provide the VRFrameData object.
+    window.VRFrameData = VRFrameData;
+
+    // A lot of Chrome builds don't have depthNear and depthFar, even
+    // though they're in the WebVR 1.0 spec. Patch them in if they're not present.
+    if(!('depthNear' in window.VRDisplay.prototype)) {
+      window.VRDisplay.prototype.depthNear = 0.01;
+    }
+
+    if(!('depthFar' in window.VRDisplay.prototype)) {
+      window.VRDisplay.prototype.depthFar = 10000.0;
+    }
+
+    window.VRDisplay.prototype.getFrameData = function(frameData) {
+      return Util.frameDataFromPose(frameData, this.getPose(), this);
+    }
+  }
+};
+
+module.exports.WebVRPolyfill = WebVRPolyfill;
+
+},{"./base.js":2,"./cardboard-vr-display.js":3,"./util.js":10}]},{},[4]);
+
+////////////////////////////////////////////////////////////////////////////////
+// start C:\Users\sean\Documents\VR\webvr-standard-monitor\src\AsyncLockRequest.js
+(function(){"use strict";
+
+function findProperty(elem, arr) {
+  for (var i = 0; i < arr.length; ++i) {
+    if (elem[arr[i]] !== undefined) {
+      return arr[i];
+    }
+  }
+}
+
+function AsyncLockRequest(name, elementOpts, changeEventOpts, errorEventOpts, requestMethodOpts, exitMethodOpts, testExtraParam) {
+  var elementName = findProperty(document, elementOpts),
+      changeEventName = findProperty(document, changeEventOpts),
+      errorEventName = findProperty(document, errorEventOpts),
+      requestMethodName = findProperty(document.documentElement, requestMethodOpts),
+      exitMethodName = findProperty(document, exitMethodOpts),
+      changeTimeout = null;
+
+  changeEventName = changeEventName && changeEventName.substring(2);
+  errorEventName = errorEventName && errorEventName.substring(2);
+
+  var ns = {
+    addChangeListener: function addChangeListener(thunk, bubbles) {
+      return document.addEventListener(changeEventName, thunk, bubbles);
+    },
+    removeChangeListener: function removeChangeListener(thunk) {
+      return document.removeEventListener(changeEventName, thunk);
+    },
+    addErrorListener: function addErrorListener(thunk, bubbles) {
+      return document.addEventListener(errorEventName, thunk, bubbles);
+    },
+    removeErrorListener: function removeErrorListener(thunk) {
+      return document.removeEventListener(errorEventName, thunk);
+    },
+    withChange: function withChange(act) {
+      return new Promise(function (resolve, reject) {
+        var onSuccess = function onSuccess() {
+          setTimeout(tearDown);
+          resolve(ns.element);
+        },
+            onError = function onError(evt) {
+          setTimeout(tearDown);
+          reject(evt);
+        },
+            stop = function stop() {
+          if (changeTimeout) {
+            clearTimeout(changeTimeout);
+            changeTimeout = null;
+          }
+        },
+            tearDown = function tearDown() {
+          stop();
+          ns.removeChangeListener(onSuccess);
+          ns.removeErrorListener(onError);
+        };
+
+        ns.addChangeListener(onSuccess, false);
+        ns.addErrorListener(onError, false);
+
+        if (act()) {
+          // we've already gotten lock, so don't wait for it.
+          onSuccess();
+        } else {
+          // Timeout waiting on the lock to happen, for systems like iOS that
+          // don't properly support it, even though they say they do.
+          stop();
+          changeTimeout = setTimeout(function () {
+            return onError(name + " state did not change in allotted time");
+          }, 1000);
+        }
+      });
+    },
+    request: function request(elem, extraParam) {
+      if (testExtraParam) {
+        extraParam = testExtraParam(extraParam);
+      }
+      return ns.withChange(function () {
+        if (!requestMethodName) {
+          throw new Error("No " + name + " API support.");
+        } else if (ns.isActive) {
+          return true;
+        } else if (extraParam) {
+          elem[requestMethodName](extraParam);
+        } else {
+          elem[requestMethodName]();
+        }
+      });
+    },
+    exit: function exit() {
+      return ns.withChange(function () {
+        if (!exitMethodName) {
+          throw new Error("No Fullscreen API support.");
+        } else if (!ns.isActive) {
+          return true;
+        } else {
+          document[exitMethodName]();
+        }
+      });
+    }
+  };
+
+  Object.defineProperties(ns, {
+    element: {
+      get: function get() {
+        return document[elementName];
+      }
+    },
+    isActive: {
+      get: function get() {
+        return !!document[elementName];
+      }
+    }
+  });
+
+  return ns;
+}
+if(typeof window !== "undefined") window.AsyncLockRequest = AsyncLockRequest;
+})();
+// end C:\Users\sean\Documents\VR\webvr-standard-monitor\src\AsyncLockRequest.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start C:\Users\sean\Documents\VR\webvr-standard-monitor\src\FullScreen.js
+(function(){"use strict";
+
+var FullScreen = AsyncLockRequest("Fullscreen", ["fullscreenElement", "mozFullScreenElement", "webkitFullscreenElement", "msFullscreenElement"], ["onfullscreenchange", "onmozfullscreenchange", "onwebkitfullscreenchange", "onmsfullscreenchange"], ["onfullscreenerror", "onmozfullscreenerror", "onwebkitfullscreenerror", "onmsfullscreenerror"], ["requestFullscreen", "mozRequestFullScreen", "webkitRequestFullscreen", "webkitRequestFullScreen", "msRequestFullscreen"], ["exitFullscreen", "mozExitFullScreen", "webkitExitFullscreen", "webkitExitFullScreen", "msExitFullscreen"], function (arg) {
+  return arg || window.Element && window.Element.ALLOW_KEYBOARD_INPUT || undefined;
+});
+if(typeof window !== "undefined") window.FullScreen = FullScreen;
+})();
+// end C:\Users\sean\Documents\VR\webvr-standard-monitor\src\FullScreen.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start C:\Users\sean\Documents\VR\webvr-standard-monitor\src\Orientation.js
+(function(){"use strict";
+
+function lockOrientation(element) {
+  var type = screen.orientation && screen.orientation.type || screen.mozOrientation || "";
+  if (type.indexOf("landscape") === -1) {
+    type = "landscape-primary";
+  }
+  if (screen.orientation && screen.orientation.lock) {
+    return screen.orientation.lock(type);
+  } else if (screen.mozLockOrientation) {
+    var locked = screen.mozLockOrientation(type);
+    if (locked) {
+      return Promise.resolve(element);
+    }
+  } else {
+    return Promise.reject(new Error("Pointer lock not supported."));
+  }
+}
+
+function unlockOrientation() {
+  if (screen.orientation && screen.orientation.unlock) {
+    screen.orientation.unlock();
+  } else if (screen.mozUnlockOrientation) {
+    screen.mozUnlockOrientation();
+  }
+}
+
+var Orientation = {
+  lock: lockOrientation,
+  unlock: unlockOrientation
+};
+if(typeof window !== "undefined") window.Orientation = Orientation;
+})();
+// end C:\Users\sean\Documents\VR\webvr-standard-monitor\src\Orientation.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start C:\Users\sean\Documents\VR\webvr-standard-monitor\src\PointerLock.js
+(function(){"use strict";
+
+var PointerLock = AsyncLockRequest("Pointer Lock", ["pointerLockElement", "mozPointerLockElement", "webkitPointerLockElement"], ["onpointerlockchange", "onmozpointerlockchange", "onwebkitpointerlockchange"], ["onpointerlockerror", "onmozpointerlockerror", "onwebkitpointerlockerror"], ["requestPointerLock", "mozRequestPointerLock", "webkitRequestPointerLock", "webkitRequestPointerLock"], ["exitPointerLock", "mozExitPointerLock", "webkitExitPointerLock", "webkitExitPointerLock"]);
+if(typeof window !== "undefined") window.PointerLock = PointerLock;
+})();
+// end C:\Users\sean\Documents\VR\webvr-standard-monitor\src\PointerLock.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start C:\Users\sean\Documents\VR\webvr-standard-monitor\src\WebVRStandardMonitor.js
+(function(){"use strict";
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
+
+var isMobile = function (a) {
+  return (/(android|bb\d+|meego).+|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od|ad)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows (ce|phone)|xda|xiino/i.test(a) || /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(a.substring(0, 4))
+  );
+}(navigator.userAgent || navigator.vendor || window.opera),
+    heap = new WeakMap();
+
+function priv(obj, value) {
+  if (!heap.has(obj)) {
+    heap.set(obj, value || {});
+  }
+  return heap.get(obj);
+}
+
+function immutable(value) {
+  var getter = typeof value === "function" ? value : function () {
+    return value;
+  };
+  return {
+    enumerable: true,
+    get: getter,
+    set: function set() {
+      throw new Error("This value is immutable and may only be read, not written.");
+    }
+  };
+}
+
+function mutable(value, type) {
+  return {
+    enumerable: true,
+    get: function get() {
+      return value;
+    },
+    set: function set(v) {
+      var t = typeof v === "undefined" ? "undefined" : _typeof(v);
+      if (t !== type) {
+        throw new Error("Value must be a " + type + ". An " + t + " was provided instead: " + v);
+      }
+      value = v;
+    }
+  };
+}
+
+function warn(msg) {
+  return function (exp) {
+    console.warn(msg, exp);
+  };
+}
+
+function WebVRStandardMonitor(display) {
+  if (!priv(WebVRStandardMonitor).shimSetup) {
+    priv(WebVRStandardMonitor).shimSetup = true;
+    var oldGetVRDisplays = navigator.getVRDisplays || Promise.resolve.bind(Promise, []);
+    navigator.getVRDisplays = function () {
+      return oldGetVRDisplays.call(navigator).then(function (displays) {
+        var created = false;
+        for (var i = 0; i < displays.length && !created; ++i) {
+          var dsp = displays[i];
+          created = dsp instanceof WebVRStandardMonitor;
+        }
+        if (!created) {
+          displays.unshift(new WebVRStandardMonitor(displays[0]));
+        }
+        return displays;
+      });
+    };
+  }
+
+  if (this !== window && this !== undefined) {
+    priv(this, {
+      currentLayers: [],
+      display: display
+    });
+
+    Object.defineProperties(this, {
+      capabilities: immutable(Object.defineProperties({}, {
+        hasPosition: immutable(false),
+        hasOrientation: immutable(isMobile),
+        hasExternalDisplay: immutable(false),
+        canPresent: immutable(true),
+        maxLayers: immutable(1)
+      })),
+      isPolyfilled: immutable(display && display.isPolyfilled || false),
+      displayId: immutable(0),
+      displayName: immutable(isMobile && "Magic Window" || "Standard Monitor"),
+      isConnected: immutable(true),
+      stageParameters: immutable(null),
+      isPresenting: immutable(function () {
+        return FullScreen.isActive;
+      }),
+
+      depthNear: mutable(0.01, "number"),
+      depthFar: mutable(10000.0, "number")
+    });
+  }
+}
+
+priv(WebVRStandardMonitor, {
+  shimSetup: false
+});
+
+WebVRStandardMonitor.prototype.requestAnimationFrame = window.requestAnimationFrame.bind(window);
+WebVRStandardMonitor.prototype.cancelAnimationFrame = window.cancelAnimationFrame.bind(window);
+WebVRStandardMonitor.prototype.submitFrame = function () {};
+
+function defaultPose() {
+  return {
+    position: [0, 0, 0],
+    orientation: [0, 0, 0, 1],
+    linearVelocity: null,
+    linearAcceleration: null,
+    angularVelocity: null,
+    angularAcceleration: null
+  };
+}
+
+WebVRStandardMonitor.prototype.getPose = function () {
+  var display = isMobile && priv(this).display;
+  if (display) {
+    return display.getPose();
+  } else {
+    return defaultPose();
+  }
+};
+
+WebVRStandardMonitor.prototype.getImmediatePose = function () {
+  var display = isMobile && priv(this).display;
+  if (display) {
+    return display.getImmediatePose();
+  } else {
+    return defaultPose();
+  }
+};
+
+WebVRStandardMonitor.prototype.resetPose = function () {
+  var display = isMobile && priv(this).display;
+  if (display) {
+    return display.resetPose();
+  }
+};
+
+function fireDisplayPresentChange(evt) {
+  if (!FullScreen.isActive) {
+    FullScreen.removeChangeListener(fireDisplayPresentChange);
+  }
+  window.dispatchEvent(new Event("vrdisplaypresentchange"));
+}
+
+WebVRStandardMonitor.standardFullScreenBehavior = function (elem) {
+  return FullScreen.request(elem).catch(warn("FullScreen failed")).then(WebVRStandardMonitor.standardLockBehavior);
+};
+
+WebVRStandardMonitor.standardLockBehavior = function (elem) {
+  if (isMobile) {
+    return Orientation.lock(elem).catch(warn("OrientationLock failed"));
+  } else {
+    return PointerLock.request(elem).catch(warn("PointerLock failed"));
+  }
+};
+
+WebVRStandardMonitor.standardExitFullScreenBehavior = function () {
+  return WebVRStandardMonitor.standardUnlockBehavior().then(function () {
+    return FullScreen.exit();
+  }).catch(warn("FullScreen failed"));
+};
+
+WebVRStandardMonitor.standardUnlockBehavior = function () {
+  if (isMobile) {
+    Orientation.unlock();
+    return Promise.resolve();
+  } else {
+    return PointerLock.exit().catch(warn("PointerLock exit failed"));
+  }
+};
+
+WebVRStandardMonitor.prototype.requestPresent = function (layers) {
+  for (var i = 0; i < this.capabilities.maxLayers && i < layers.length; ++i) {
+    priv(this).currentLayers[i] = layers[i];
+  }
+  var elem = layers[0].source;
+  if (isMobile) {
+    return priv(this).display.requestPresent(layers).then(function () {
+      return WebVRStandardMonitor.standardLockBehavior(elem);
+    });
+  } else {
+    FullScreen.addChangeListener(fireDisplayPresentChange);
+    return WebVRStandardMonitor.standardFullScreenBehavior(elem);
+  }
+};
+
+WebVRStandardMonitor.prototype.getLayers = function () {
+  return priv(this).currentLayers.slice();
+};
+
+WebVRStandardMonitor.prototype.exitPresent = function () {
+  var _this = priv(this);
+  _this.currentLayers.splice(0);
+
+  if (isMobile) {
+    return WebVRStandardMonitor.standardUnlockBehavior().then(function () {
+      return _this.display.exitPresent();
+    });
+  } else {
+    return WebVRStandardMonitor.standardExitFullScreenBehavior();
+  }
+};
+
+WebVRStandardMonitor.prototype.getEyeParameters = function (side) {
+  if (side === "left") {
+    var curLayer = this.getLayers()[0],
+        elem = curLayer && curLayer.source || document.body,
+        width = FullScreen.isActive ? screen.width : elem.clientWidth,
+        height = FullScreen.isActive ? screen.height : elem.clientHeight,
+        aspect = width / height,
+        vFOV = 25,
+        hFOV = vFOV * aspect;
+    return {
+      renderWidth: width * devicePixelRatio,
+      renderHeight: height * devicePixelRatio,
+      offset: new Float32Array([0, 0, 0]),
+      fieldOfView: {
+        upDegrees: vFOV,
+        downDegrees: vFOV,
+        leftDegrees: hFOV,
+        rightDegrees: hFOV
+      }
+    };
+  }
+};
+if(typeof window !== "undefined") window.WebVRStandardMonitor = WebVRStandardMonitor;
+})();
+// end C:\Users\sean\Documents\VR\webvr-standard-monitor\src\WebVRStandardMonitor.js
+////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 // start D:\Documents\VR\Primrose\src\axis.js
 (function(){"use strict";
@@ -55181,6 +57003,7 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
 
     var _this = _possibleConstructorReturn(this, (BrowserEnvironment.__proto__ || Object.getPrototypeOf(BrowserEnvironment)).call(this));
 
+    _this.network = null;
     _this.options = patch(options, BrowserEnvironment.DEFAULTS);
     _this.options.foregroundColor = _this.options.foregroundColor || complementColor(new THREE.Color(_this.options.backgroundColor)).getHex();
 
@@ -55202,7 +57025,9 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
       doPicking();
       moveSky();
       moveGround();
-      _this.network.update(dt);
+      if (_this.network) {
+        _this.network.update(dt);
+      }
 
       _this.emit("update", dt);
     };
@@ -55732,12 +57557,13 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
       }
     };
 
-    var addAvatar = function addAvatar(user) {
+    _this.addAvatar = function (user) {
+      console.log(user);
       _this.scene.add(user.stage);
       _this.scene.add(user.head);
     };
 
-    var removeAvatar = function removeAvatar(user) {
+    _this.removeAvatar = function (user) {
       _this.scene.remove(user.stage);
       _this.scene.remove(user.head);
     };
@@ -55909,16 +57735,16 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
 
       _this.input.head.add(_this.camera);
 
-      _this.network = new Primrose.Network.Manager(_this.input, _this.audio, factories, _this.options);
-      _this.network.addEventListener("addavatar", addAvatar);
-      _this.network.addEventListener("removeavatar", removeAvatar);
-
       return _this.input.ready;
     });
 
     var allReady = Promise.all([modelsReady, documentReady]).then(function () {
       _this.renderer.domElement.style.cursor = "default";
-      _this.input.VR.displays[0].DOMElement = _this.renderer.domElement;
+      _this.input.VR.displays.forEach(function (display) {
+        if (display.DOMElement !== undefined) {
+          display.DOMElement = _this.renderer.domElement;
+        }
+      });
       _this.input.VR.connect(0);
       _this.emit("ready");
       window.dispatchEvent(new CustomEvent("vrbrowserenvironmentready", {
@@ -55988,6 +57814,11 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
   _createClass(BrowserEnvironment, [{
     key: "connect",
     value: function connect(socket, userName) {
+      if (!this.network) {
+        this.network = new Primrose.Network.Manager(this.input, this.audio, this.factories, this.options);
+        this.network.addEventListener("addavatar", this.addAvatar);
+        this.network.addEventListener("removeavatar", this.removeAvatar);
+      }
       return this.network && this.network.connect(socket, userName);
     }
   }, {
@@ -56004,6 +57835,23 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
           this.network.setAudioFromUser.apply(this.network, this.audioQueue.shift());
         }
       }
+    }
+  }, {
+    key: "insertFullScreenButtons",
+    value: function insertFullScreenButtons(containerSpec) {
+      var _this2 = this;
+
+      var container = document.querySelector(containerSpec);
+      return this.displays.map(function (display, i) {
+        var btn = document.createElement("button"),
+            isStereo = Primrose.Input.VR.isStereoDisplay(display),
+            enterVR = _this2.goFullScreen.bind(_this2, i);
+        btn.type = "button";
+        btn.appendChild(document.createTextNode(display.displayName));
+        btn.addEventListener("click", enterVR, false);
+        container.appendChild(btn);
+        return btn;
+      });
     }
   }, {
     key: "lockMovement",
@@ -57115,14 +58963,7 @@ if(typeof window !== "undefined") window.Primrose.loadTexture = loadTexture;
 
 // The JSON format object loader is not always included in the Three.js distribution,
 // so we have to first check for it.
-var loaders = {
-  ".json": THREE.ObjectLoader,
-  ".fbx": THREE.FBXLoader,
-  ".mtl": THREE.MTLLoader,
-  ".obj": THREE.OBJLoader,
-  ".stl": THREE.STLLoader,
-  ".typeface.json": THREE.FontLoader
-},
+var loaders = null,
     mime = {
   "text/prs.wavefront-obj": "obj",
   "text/prs.wavefront-mtl": "mtl"
@@ -57203,6 +59044,16 @@ ModelLoader.loadObject = function (src, type, progress) {
     return Promise.reject("File path `" + src + "` does not have a file extension, and a type was not provided as a parameter, so we can't determine the type.");
   } else {
     extension = extension.toLowerCase();
+    if (loaders === null) {
+      loaders = {
+        ".json": THREE.ObjectLoader,
+        ".fbx": THREE.FBXLoader,
+        ".mtl": THREE.MTLLoader,
+        ".obj": THREE.OBJLoader,
+        ".stl": THREE.STLLoader,
+        ".typeface.json": THREE.FontLoader
+      };
+    }
     var Loader = new loaders[extension]();
     if (!Loader) {
       return Promise.reject("There is no loader type for the file extension: " + extension);
@@ -58772,6 +60623,30 @@ function _inherits(subClass, superClass) { if (typeof superClass !== "function" 
 
 var COUNTER = 0,
     _ = priv();
+
+// Videos don't auto-play on mobile devices, so let's make them all play whenever
+// we tap the screen.
+var processedVideos = [];
+function findAndFixVideo(evt) {
+  var vids = document.querySelectorAll("video");
+  for (var i = 0; i < vids.length; ++i) {
+    fixVideo(vids[i]);
+  }
+  window.removeEventListener("touchend", findAndFixVideo);
+  window.removeEventListener("mouseup", findAndFixVideo);
+  window.removeEventListener("keyup", findAndFixVideo);
+}
+
+function fixVideo(vid) {
+  if (processedVideos.indexOf(vid) === -1) {
+    processedVideos.push(vid);
+    makeVideoPlayableInline(vid, false);
+  }
+}
+
+window.addEventListener("touchend", findAndFixVideo, false);
+window.addEventListener("mouseup", findAndFixVideo, false);
+window.addEventListener("keyup", findAndFixVideo, false);
 
 var Image = function (_Primrose$Entity) {
   _inherits(Image, _Primrose$Entity);
@@ -60549,7 +62424,7 @@ function _inherits(subClass, superClass) { if (typeof superClass !== "function" 
 //   API requires a network connection, as the processing is done on an external
 //   server.
 //
-//   Constructor: new SpeechInput(name, commands, socket);
+//   Constructor: new SpeechInput(name, commands);
 //
 //   The `name` parameter is used when transmitting the commands through the command
 //   proxy server.
@@ -60572,9 +62447,6 @@ function _inherits(subClass, superClass) { if (typeof superClass !== "function" 
 //
 //  The `command` property is the callback function that will be executed. It takes no
 //  parameters.
-//
-//  The `socket` (optional) parameter is a WebSocket connecting back to the command
-//  proxy server.
 //
 //  Methods:
 //  `start()`: starts the command unrecognition, unless it's not available, in which
@@ -61269,10 +63141,10 @@ var Manager = function (_Primrose$AbstractEve) {
           user.setState(state);
         }
       } else if (this.deviceIndex > 0) {
-        this.localUser.stage.mesh.position.fromArray(state, 1);
-        this.localUser.stage.mesh.quaternion.fromArray(state, 4);
-        this.localUser.head.mesh.position.fromArray(state, 8);
-        this.localUser.head.mesh.quaternion.fromArray(state, 11);
+        this.localUser.stage.position.fromArray(state, 1);
+        this.localUser.stage.quaternion.fromArray(state, 4);
+        this.localUser.head.position.fromArray(state, 8);
+        this.localUser.head.quaternion.fromArray(state, 11);
       }
     }
   }, {
@@ -61887,117 +63759,6 @@ Audio3D.isAvailable = !!window.AudioContext && AudioContext.prototype.createGain
 if(typeof window !== "undefined") window.Primrose.Output.Audio3D = Audio3D;
 })();
 // end D:\Documents\VR\Primrose\src\Primrose\Output\Audio3D.js
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-// start D:\Documents\VR\Primrose\src\Primrose\Output\HapticGlove.js
-(function(){"use strict";
-
-function HapticGlove(options) {
-
-  options.port = options.port || HapticGlove.DEFAULT_PORT;
-  options.addr = options.addr || HapticGlove.DEFAULT_HOST;
-  this.tips = [];
-  this.numJoints = options.hands * options.fingers * options.joints;
-
-  var enabled = false,
-      connected = false;
-
-  Leap.loop();
-
-  this.setEnvironment = function (opts) {
-    options.world = opts.world;
-    options.scene = opts.scene;
-    options.camera = opts.camera;
-
-    Leap.loopController.on("frame", readFrame.bind(this));
-  };
-
-  var tipNames = ["tipPosition", "dipPosition", "pipPosition", "mcpPosition", "carpPosition"];
-
-  function readFrame(frame) {
-    if (frame.valid) {
-      enabled = frame.hands.length > 0;
-      for (var h = 0; h < options.hands && h < frame.hands.length; ++h) {
-        var hand = frame.hands[h];
-        for (var f = 0; f < options.fingers; ++f) {
-          var finger = hand.fingers[f];
-          for (var j = 0; j < options.joints; ++j) {
-            var n = h * options.fingers * options.joints + f * options.joints + j;
-            if (n < this.tips.length) {
-              var p = finger[tipNames[j]];
-              var t = this.tips[n];
-              t.position.set(p[0], p[1], p[2]);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  var socket,
-      fingerState = 0;
-
-  if (options.port !== 80) {
-    options.addr += ":" + options.port;
-  }
-
-  socket = io.connect(options.addr, {
-    "reconnect": true,
-    "reconnection delay": 1000,
-    "max reconnection attempts": 5
-  });
-
-  socket.on("connect", function () {
-    connected = true;
-    console.log("Connected!");
-  });
-
-  socket.on("disconnect", function () {
-    connected = false;
-    console.log("Disconnected!");
-  });
-
-  this.readContacts = function (contacts) {
-    var count = 0;
-    for (var c = 0; enabled && count < 2 && c < contacts.length; ++c) {
-      var contact = contacts[c];
-      for (var h = 0; h < options.hands && count < 2; ++h) {
-        for (var f = 0; f < options.fingers; ++f) {
-          var t = this.tips[f];
-          var found = false;
-          if (contact.bi === t) {
-            if (contact.bj.graphics && contact.bj.graphics.isSolid) {
-              this.setFingerState(f, true);
-              found = true;
-              ++count;
-            }
-          }
-          if (!found) {
-            this.setFingerState(f, false);
-          }
-        }
-      }
-    }
-  };
-
-  this.setFingerState = function (i, value) {
-    var mask = 0x1 << i;
-    if (value) {
-      fingerState = fingerState | mask;
-    } else {
-      fingerState = fingerState & ~mask & 0x1f;
-    }
-    if (connected) {
-      socket.emit("data", fingerState);
-    }
-  };
-}
-
-HapticGlove.DEFAULT_PORT = 8383;
-HapticGlove.DEFAULT_HOST = document.location.hostname;
-if(typeof window !== "undefined") window.Primrose.Output.HapticGlove = HapticGlove;
-})();
-// end D:\Documents\VR\Primrose\src\Primrose\Output\HapticGlove.js
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 // start D:\Documents\VR\Primrose\src\Primrose\Output\Music.js
@@ -65943,6 +67704,542 @@ if(typeof window !== "undefined") window.Primrose.X.SignupForm = SignupForm;
 // end D:\Documents\VR\Primrose\src\Primrose\X\SignupForm.js
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\MTLLoader.js
+(function(){'use strict';
+
+/**
+ * Loads a Wavefront .mtl file specifying materials
+ *
+ * @author angelxuanchang
+ */
+
+function MTLLoader(manager) {
+
+    this.manager = manager !== undefined ? manager : THREE.DefaultLoadingManager;
+}
+
+// http://paulbourke.net/dataformats/mtl/
+Object.assign(MTLLoader, {
+    COLOR_ON_AND_AMBIENT_OFF: 0,
+    COLOR_ON_AND_AMBIENT_ON: 1,
+    HIGHLIGHT_ON: 2,
+    REFLECTION_ON_AND_RAY_TRACE_ON: 3,
+    TRANSPARENCY_GLASS_ON_REFLECTION_RAY_TRACE_ON: 4,
+    REFLECTION_FRESNEL_ON_AND_RAY_TRACE_ON: 5,
+    TRANSPARENCY_REFRACTION_ON_REFLECTION_FRESNEL_OFF_AND_RAY_TRACE_ON: 6,
+    TRANSPARENCY_REFRACTION_ON_REFLECTION_FRESNEL_ON_AND_RAY_TRACE_ON: 7,
+    REFLECTION_ON_AND_RAY_TRACE_OFF: 8,
+    TRANSPARENCY_GLASS_ON_REFLECTION_RAY_TRACE_OFF: 9,
+    CASTS_SHADOWS_ONTO_INVISIBLE_SURFACES: 10
+});
+
+Object.assign(MTLLoader.prototype, THREE.EventDispatcher.prototype, {
+
+    /**
+     * Loads and parses a MTL asset from a URL.
+     *
+     * @param {String} url - URL to the MTL file.
+     * @param {Function} [onLoad] - Callback invoked with the loaded object.
+     * @param {Function} [onProgress] - Callback for download progress.
+     * @param {Function} [onError] - Callback for download errors.
+     *
+     * @see setPath setTexturePath
+     *
+     * @note In order for relative texture references to resolve correctly
+     * you must call setPath and/or setTexturePath explicitly prior to load.
+     */
+    load: function load(url, onLoad, onProgress, onError) {
+
+        var scope = this;
+
+        var loader = new THREE.XHRLoader(this.manager);
+        loader.setPath(this.path);
+        loader.load(url, function (text) {
+
+            onLoad(scope.parse(text));
+        }, onProgress, onError);
+    },
+
+    /**
+     * Set base path for resolving references.
+     * If set this path will be prepended to each loaded and found reference.
+     *
+     * @see setTexturePath
+     * @param {String} path
+     *
+     * @example
+     *     mtlLoader.setPath( 'assets/obj/' );
+     *     mtlLoader.load( 'my.mtl', ... );
+     */
+    setPath: function setPath(path) {
+
+        this.path = path;
+    },
+
+    /**
+     * Set base path for resolving texture references.
+     * If set this path will be prepended found texture reference.
+     * If not set and setPath is, it will be used as texture base path.
+     *
+     * @see setPath
+     * @param {String} path
+     *
+     * @example
+     *     mtlLoader.setPath( 'assets/obj/' );
+     *     mtlLoader.setTexturePath( 'assets/textures/' );
+     *     mtlLoader.load( 'my.mtl', ... );
+     */
+    setTexturePath: function setTexturePath(path) {
+
+        this.texturePath = path;
+    },
+
+    setBaseUrl: function setBaseUrl(path) {
+
+        console.warn('MTLLoader: .setBaseUrl() is deprecated. Use .setTexturePath( path ) for texture path or .setPath( path ) for general base path instead.');
+
+        this.setTexturePath(path);
+    },
+
+    setCrossOrigin: function setCrossOrigin(value) {
+
+        this.crossOrigin = value;
+    },
+
+    setMaterialOptions: function setMaterialOptions(value) {
+
+        this.materialOptions = value;
+    },
+
+    /**
+     * Parses a MTL file.
+     *
+     * @param {String} text - Content of MTL file
+     * @return {MTLLoader.MaterialCreator}
+     *
+     * @see setPath setTexturePath
+     *
+     * @note In order for relative texture references to resolve correctly
+     * you must call setPath and/or setTexturePath explicitly prior to parse.
+     */
+    parse: function parse(text) {
+
+        var lines = text.split('\n');
+        var info = {};
+        var delimiter_pattern = /\s+/;
+        var materialsInfo = {};
+
+        for (var i = 0; i < lines.length; i++) {
+
+            var line = lines[i];
+            line = line.trim();
+
+            if (line.length === 0 || line.charAt(0) === '#') {
+
+                // Blank line or comment ignore
+                continue;
+            }
+
+            var pos = line.indexOf(' ');
+
+            var key = pos >= 0 ? line.substring(0, pos) : line;
+            key = key.toLowerCase();
+
+            var value = pos >= 0 ? line.substring(pos + 1) : '';
+            value = value.trim();
+
+            if (key === 'newmtl') {
+
+                // New material
+
+                info = { name: value };
+                materialsInfo[value] = info;
+            } else if (info) {
+
+                if (key === 'ka' || key === 'kd' || key === 'ks') {
+
+                    var ss = value.split(delimiter_pattern, 3);
+                    info[key] = [parseFloat(ss[0]), parseFloat(ss[1]), parseFloat(ss[2])];
+                } else {
+
+                    info[key] = value;
+                }
+            }
+        }
+
+        var materialCreator = new MTLLoader.MaterialCreator(this.texturePath || this.path, this.materialOptions);
+        materialCreator.setCrossOrigin(this.crossOrigin);
+        materialCreator.setManager(this.manager);
+        materialCreator.setMaterials(materialsInfo);
+        return materialCreator;
+    }
+
+});
+
+/**
+ * Create a new MTLLoader.MaterialCreator
+ * @param baseUrl - Url relative to which textures are loaded
+ * @param options - Set of options on how to construct the materials
+ *                  side: Which side to apply the material
+ *                        THREE.FrontSide (default), THREE.BackSide, THREE.DoubleSide
+ *                  wrap: What type of wrapping to apply for textures
+ *                        THREE.RepeatWrapping (default), THREE.ClampToEdgeWrapping, THREE.MirroredRepeatWrapping
+ *                  normalizeRGB: RGBs need to be normalized to 0-1 from 0-255
+ *                                Default: false, assumed to be already normalized
+ *                  ignoreZeroRGBs: Ignore values of RGBs (Ka,Kd,Ks) that are all 0's
+ *                                  Default: false
+ * @constructor
+ */
+
+MTLLoader.MaterialCreator = function (baseUrl, options) {
+
+    this.baseUrl = baseUrl || '';
+    this.options = options;
+    this.materialsInfo = {};
+    this.materials = {};
+    this.materialsArray = [];
+    this.nameLookup = {};
+
+    this.side = this.options && this.options.side ? this.options.side : THREE.FrontSide;
+    this.wrap = this.options && this.options.wrap ? this.options.wrap : THREE.RepeatWrapping;
+};
+
+MTLLoader.MaterialCreator.prototype = {
+
+    constructor: MTLLoader.MaterialCreator,
+
+    setCrossOrigin: function setCrossOrigin(value) {
+
+        this.crossOrigin = value;
+    },
+
+    setManager: function setManager(value) {
+
+        this.manager = value;
+    },
+
+    setMaterials: function setMaterials(materialsInfo) {
+
+        this.materialsInfo = this.convert(materialsInfo);
+        this.materials = {};
+        this.materialsArray = [];
+        this.nameLookup = {};
+    },
+
+    convert: function convert(materialsInfo) {
+
+        if (!this.options) return materialsInfo;
+
+        var converted = {};
+
+        for (var mn in materialsInfo) {
+
+            // Convert materials info into normalized form based on options
+
+            var mat = materialsInfo[mn];
+
+            var covmat = {};
+
+            converted[mn] = covmat;
+
+            for (var prop in mat) {
+
+                var save = true;
+                var value = mat[prop];
+                var lprop = prop.toLowerCase();
+
+                switch (lprop) {
+
+                    case 'kd':
+                    case 'ka':
+                    case 'ks':
+
+                        // Diffuse color (color under white light) using RGB values
+
+                        if (this.options && this.options.normalizeRGB) {
+
+                            value = [value[0] / 255, value[1] / 255, value[2] / 255];
+                        }
+
+                        if (this.options && this.options.ignoreZeroRGBs) {
+
+                            if (value[0] === 0 && value[1] === 0 && value[2] === 0) {
+
+                                // ignore
+
+                                save = false;
+                            }
+                        }
+
+                        break;
+
+                    default:
+
+                        break;
+                }
+
+                if (save) {
+
+                    covmat[lprop] = value;
+                }
+            }
+        }
+
+        return converted;
+    },
+
+    preload: function preload() {
+
+        for (var mn in this.materialsInfo) {
+
+            this.create(mn);
+        }
+    },
+
+    getIndex: function getIndex(materialName) {
+
+        return this.nameLookup[materialName];
+    },
+
+    getAsArray: function getAsArray() {
+
+        var index = 0;
+
+        for (var mn in this.materialsInfo) {
+
+            this.materialsArray[index] = this.create(mn);
+            this.nameLookup[mn] = index;
+            index++;
+        }
+
+        return this.materialsArray;
+    },
+
+    create: function create(materialName) {
+
+        if (this.materials[materialName] === undefined) {
+
+            this.createMaterial_(materialName);
+        }
+
+        return this.materials[materialName];
+    },
+
+    createMaterial_: function createMaterial_(materialName) {
+
+        // Create material
+
+        var TMaterial = THREE.MeshPhongMaterial;
+        var scope = this;
+        var mat = this.materialsInfo[materialName];
+        var params = {
+
+            name: materialName,
+            side: this.side
+
+        };
+
+        var resolveURL = function resolveURL(baseUrl, url) {
+
+            if (typeof url !== 'string' || url === '') return '';
+
+            // Absolute URL
+            if (/^https?:\/\//i.test(url)) {
+                return url;
+            }
+
+            return baseUrl + url;
+        };
+
+        function setMapForType(mapType, value) {
+
+            if (params[mapType]) return; // Keep the first encountered texture
+
+            var texParams = scope.getTextureParams(value, params);
+            var map = scope.loadTexture(resolveURL(scope.baseUrl, texParams.url));
+
+            map.repeat.copy(texParams.scale);
+            map.offset.copy(texParams.offset);
+
+            map.wrapS = scope.wrap;
+            map.wrapT = scope.wrap;
+
+            params[mapType] = map;
+        }
+
+        for (var prop in mat) {
+
+            var value = mat[prop];
+
+            if (value === '') continue;
+
+            switch (prop.toLowerCase()) {
+
+                // Ns is material specular exponent
+
+                case 'kd':
+
+                    // Diffuse color (color under white light) using RGB values
+
+                    params.color = new THREE.Color().fromArray(value);
+
+                    break;
+
+                case 'ks':
+
+                    // Specular color (color when light is reflected from shiny surface) using RGB values
+                    params.specular = new THREE.Color().fromArray(value);
+
+                    break;
+
+                case 'map_kd':
+
+                    // Diffuse texture map
+
+                    setMapForType("map", value);
+
+                    break;
+
+                case 'map_ks':
+
+                    // Specular map
+
+                    setMapForType("specularMap", value);
+
+                    break;
+
+                case 'map_bump':
+                case 'bump':
+
+                    // Bump texture map
+
+                    setMapForType("bumpMap", value);
+
+                    break;
+
+                case 'ns':
+
+                    // The specular exponent (defines the focus of the specular highlight)
+                    // A high exponent results in a tight, concentrated highlight. Ns values normally range from 0 to 1000.
+
+                    params.shininess = parseFloat(value);
+
+                    break;
+
+                case 'd':
+
+                    if (value < 1) {
+
+                        params.opacity = value;
+                        params.transparent = true;
+                    }
+
+                    break;
+
+                case 'illum':
+
+                    value = parseFloat(value);
+
+                    if (value === MTLLoader.COLOR_ON_AND_AMBIENT_OFF) {
+
+                        TMaterial = THREE.MeshBasicMaterial;
+                    }
+
+                    break;
+
+                case 'Tr':
+
+                    if (value > 0) {
+
+                        params.opacity = 1 - value;
+                        params.transparent = true;
+                    }
+
+                    break;
+
+                default:
+                    break;
+
+            }
+        }
+
+        if (TMaterial === THREE.MeshBasicMaterial) {
+
+            ["shininess", "specular"].forEach(function (attribute) {
+
+                if (attribute in params) {
+
+                    delete params[attribute];
+                }
+            });
+        }
+
+        this.materials[materialName] = new TMaterial(params);
+        return this.materials[materialName];
+    },
+
+    getTextureParams: function getTextureParams(value, matParams) {
+
+        var texParams = {
+
+            scale: new THREE.Vector2(1, 1),
+            offset: new THREE.Vector2(0, 0)
+
+        };
+
+        var items = value.split(/\s+/);
+        var pos;
+
+        pos = items.indexOf('-bm');
+        if (pos >= 0) {
+
+            matParams.bumpScale = parseFloat(items[pos + 1]);
+            items.splice(pos, 2);
+        }
+
+        pos = items.indexOf('-s');
+        if (pos >= 0) {
+
+            texParams.scale.set(parseFloat(items[pos + 1]), parseFloat(items[pos + 2]));
+            items.splice(pos, 4); // we expect 3 parameters here!
+        }
+
+        pos = items.indexOf('-o');
+        if (pos >= 0) {
+
+            texParams.offset.set(parseFloat(items[pos + 1]), parseFloat(items[pos + 2]));
+            items.splice(pos, 4); // we expect 3 parameters here!
+        }
+
+        texParams.url = items.join(' ').trim();
+        return texParams;
+    },
+
+    loadTexture: function loadTexture(url, mapping, onLoad, onProgress, onError) {
+
+        var texture;
+        var loader = THREE.Loader.Handlers.get(url);
+        var manager = this.manager !== undefined ? this.manager : THREE.DefaultLoadingManager;
+
+        if (loader === null) {
+
+            loader = new THREE.TextureLoader(manager);
+        }
+
+        if (loader.setCrossOrigin) loader.setCrossOrigin(this.crossOrigin);
+        texture = loader.load(url, onLoad, onProgress, onError);
+
+        if (mapping !== undefined) texture.mapping = mapping;
+
+        return texture;
+    }
+
+};
+if(typeof window !== "undefined") window.THREE.MTLLoader = MTLLoader;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\MTLLoader.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // start D:\Documents\VR\Primrose\src\THREE\CubeTextureLoader\prototype\load.js
 (function(){"use strict";
 
@@ -66271,12 +68568,9 @@ var ctrls = Primrose.DOM.findEverything(),
     app = new Primrose.BrowserEnvironment({
   useFog: false,
   useGaze: true,
-  autoScaleQuality: true,
-  autoRescaleQuality: false,
   quality: Quality.HIGH,
   groundTexture: 0x000000,
   backgroundColor: 0x000000,
-  disableDefaultLighting: true,
   sceneModel: "models/meeting/meetingroom.obj",
   avatarModel: "models/avatar.json",
   font: "fonts/helvetiker_regular.typeface.json",
@@ -66379,20 +68673,8 @@ function environmentReady() {
     ctrls.controls.style.display = currDev && currDev.isPresenting ? "none" : "";
   });
 
-  app.displays.forEach(function (display, i) {
-    var btn = document.createElement("button"),
-        isStereo = Primrose.Input.VR.isStereoDisplay(display),
-        enterVR = app.goFullScreen.bind(app, i);
-    btn.type = "button";
-    btn.appendChild(document.createTextNode(display.displayName));
-    btn.addEventListener("click", enterVR, false);
-    ctrls.fullScreenButtonContainer.appendChild(btn);
-  });
-
-  app.scene.traverse(function (obj) {
-    if (obj.name.indexOf("LightPanel") === 0) {
-      obj.material.emissive.setRGB(1, 1, 1);
-    }
+  app.insertFullScreenButtons("#fullScreenButtonContainer").forEach(function (btn) {
+    return btn.className = "primary";
   });
 }
 
