@@ -128,16 +128,8 @@ function environmentReady() {
     ctrls.controls.style.display = currDev && currDev.isPresenting ? "none" : "";
   });
 
-  app.displays.forEach((display, i) => {
-    const btn = document.createElement("button"),
-      isStereo = Primrose.Input.VR.isStereoDisplay(display),
-      enterVR = app.goFullScreen.bind(app, i);
-    btn.type = "button";
-    btn.appendChild(document.createTextNode(display.displayName));
-    btn.addEventListener("click", enterVR, false);
-    ctrls.fullScreenButtonContainer.appendChild(btn);
-  });
-
+  app.insertFullScreenButtons("#fullScreenButtonContainer")
+    .forEach((btn) => btn.className = "primary");
 }
 
 function authenticate(evt) {
