@@ -24,7 +24,6 @@ var ctrls = Primrose.DOM.findEverything(),
     quality: Quality.HIGH,
     groundTexture: 0x000000,
     backgroundColor: 0x000000,
-    disableDefaultLighting: true,
     sceneModel: "models/meeting/meetingroom.obj",
     avatarModel: "models/avatar.json",
     font: "fonts/helvetiker_regular.typeface.json",
@@ -139,11 +138,6 @@ function environmentReady() {
     ctrls.fullScreenButtonContainer.appendChild(btn);
   });
 
-  app.scene.traverse((obj) => {
-    if (obj.name.indexOf("LightPanel") === 0) {
-      obj.material.emissive.setRGB(1, 1, 1);
-    }
-  });
 }
 
 function authenticate(evt) {
