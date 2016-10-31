@@ -21,8 +21,6 @@ var ctrls = Primrose.DOM.findEverything(),
   app = new Primrose.BrowserEnvironment({
     useFog: false,
     useGaze: true,
-    autoScaleQuality: true,
-    autoRescaleQuality: false,
     quality: Quality.HIGH,
     groundTexture: 0x000000,
     backgroundColor: 0x000000,
