@@ -24,10 +24,7 @@ html
     if debug
       script window.DEBUG = true;
       script(src=fileRoot + "../bare-bones-logger/bare-bones-logger" + jsExt)
-      script logger.setup(logger.HTTP, "/logger");
-      script(src= fileRoot + "node_modules/jshashes/hashes.js")
-      script(src= fileRoot + "../Primrose/PrimroseDependencies" + jsExt)
-      script(src= fileRoot + "../Primrose/PrimroseLib" + jsExt)
+      //- script logger.setup(logger.HTTP, "/logger");
     script(src="//static.opentok.com/v2/js/opentok.min.js")
   body
     h1 Meeting Room
@@ -50,7 +47,4 @@ html
           button#randomUserName.primary(type="button") &#x21bb;
           button#connect.primary(type="button") &rarr;
         #errorMessage(style="display:none")
-    if debug
-      script(src= fileRoot + "pre" + jsExt, data-app=fileRoot + packageName + "Lib" + jsExt)
-    else
-      script(src= fileRoot + "pre" + jsExt, data-app=fileRoot + packageName + jsExt)
+    script(src= fileRoot + "pre" + jsExt, data-app=fileRoot + packageName + jsExt)
