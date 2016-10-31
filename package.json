@@ -37,10 +37,12 @@
   "dependencies": {
     "azure-storage": "^0.10.0",
     "notion-node": "0.0.1",
-    "opentok": "^2.4.0",
-    "primrose": "^0.28.0"
+    "opentok": "^2.4.0"
   },
   "devDependencies": {
-    "notiontheory-basic-build": "^2.6.0"
+    "jshashes": "^1.0.5",
+    "notiontheory-basic-build": "^2.6.0",
+    "primrose": "^0.28.0",
+    "socket.io-client": "^1.4.8"
   }
 }
