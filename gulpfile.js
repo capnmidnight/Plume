@@ -2,7 +2,7 @@
   pkg = require("./package.json"),
   build = require("../notiontheory-basic-build"),
   nt = build.setup(gulp, pkg),
-  pre = nt.js("pre", "pre"),
+  prog = nt.js("prog", "prog"),
   js = nt.js(pkg.name + "Lib", "src", ["format"]),
   tot = nt.cat(pkg.name, [
     "node_modules/jshashes/hashes.js",
@@ -18,7 +18,7 @@
 gulp.task("format", [js.format]);
 
 gulp.task("default", [
-  pre.default,
+  prog.default,
   js.default,
   tot.default,
   html.default,
@@ -26,21 +26,21 @@ gulp.task("default", [
 ]);
 
 gulp.task("debug", [
-  pre.debug,
+  prog.debug,
   tot.debug,
   html.debug,
   css.debug
 ]);
 
 gulp.task("test", [
-  pre.release,
+  prog.release,
   tot.release,
   html.test,
   css.release
 ]);
 
 gulp.task("release", [
-  pre.release,
+  prog.release,
   clean,
   html.release,
   css.release

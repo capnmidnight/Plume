@@ -10,7 +10,7 @@ function get(file, done) {
   x.send();
 }
 
-const prog = {
+export default prog = {
   bar: null,
   files: {},
   loaded: 0,
@@ -59,9 +59,9 @@ const prog = {
       prog.bar.value = loaded;
     }
   }
-},
+};
 
-  curScripts = document.querySelectorAll("script"),
+const curScripts = document.querySelectorAll("script"),
   curScript = curScripts[curScripts.length - 1];
 
 if(curScript && curScript.dataset.app) {

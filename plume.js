@@ -52701,570 +52701,6 @@ THREE.OBJLoader.prototype = {
 /*! npm.im/iphone-inline-video */
 var makeVideoPlayableInline=function(){"use strict";/*! npm.im/intervalometer */
 function e(e,r,n,i){function t(n){d=r(t,i),e(n-(a||n)),a=n}var d,a;return{start:function(){d||t(0)},stop:function(){n(d),d=null,a=0}}}function r(r){return e(r,requestAnimationFrame,cancelAnimationFrame)}function n(e,r,n,i){function t(r){Boolean(e[n])===Boolean(i)&&r.stopImmediatePropagation(),delete e[n]}return e.addEventListener(r,t,!1),t}function i(e,r,n,i){function t(){return n[r]}function d(e){n[r]=e}i&&d(e[r]),Object.defineProperty(e,r,{get:t,set:d})}function t(e,r,n){n.addEventListener(r,function(){return e.dispatchEvent(new Event(r))})}function d(e,r){Promise.resolve().then(function(){e.dispatchEvent(new Event(r))})}function a(e){var r=new Audio;return t(e,"play",r),t(e,"playing",r),t(e,"pause",r),r.crossOrigin=e.crossOrigin,r.src=e.src||e.currentSrc||"data:",r}function o(e,r,n){(m||0)+200<Date.now()&&(e[b]=!0,m=Date.now()),n||(e.currentTime=r),A[++k%3]=100*r|0}function u(e){return e.driver.currentTime>=e.video.duration}function s(e){var r=this;r.video.readyState>=r.video.HAVE_FUTURE_DATA?(r.hasAudio||(r.driver.currentTime=r.video.currentTime+e*r.video.playbackRate/1e3,r.video.loop&&u(r)&&(r.driver.currentTime=0)),o(r.video,r.driver.currentTime)):r.video.networkState!==r.video.NETWORK_IDLE||r.video.buffered.length||r.video.load(),r.video.ended&&(delete r.video[b],r.video.pause(!0))}function c(){var e=this,r=e[h];return e.webkitDisplayingFullscreen?void e[E]():("data:"!==r.driver.src&&r.driver.src!==e.src&&(o(e,0,!0),r.driver.src=e.src),void(e.paused&&(r.paused=!1,e.buffered.length||e.load(),r.driver.play(),r.updater.start(),r.hasAudio||(d(e,"play"),r.video.readyState>=r.video.HAVE_ENOUGH_DATA&&d(e,"playing")))))}function v(e){var r=this,n=r[h];n.driver.pause(),n.updater.stop(),r.webkitDisplayingFullscreen&&r[T](),n.paused&&!e||(n.paused=!0,n.hasAudio||d(r,"pause"),r.ended&&(r[b]=!0,d(r,"ended")))}function p(e,n){var i=e[h]={};i.paused=!0,i.hasAudio=n,i.video=e,i.updater=r(s.bind(i)),n?i.driver=a(e):(e.addEventListener("canplay",function(){e.paused||d(e,"playing")}),i.driver={src:e.src||e.currentSrc||"data:",muted:!0,paused:!0,pause:function(){i.driver.paused=!0},play:function(){i.driver.paused=!1,u(i)&&o(e,0)},get ended(){return u(i)}}),e.addEventListener("emptied",function(){var r=!i.driver.src||"data:"===i.driver.src;i.driver.src&&i.driver.src!==e.src&&(o(e,0,!0),i.driver.src=e.src,r?i.driver.play():i.updater.stop())},!1),e.addEventListener("webkitbeginfullscreen",function(){e.paused?n&&!i.driver.buffered.length&&i.driver.load():(e.pause(),e[E]())}),n&&(e.addEventListener("webkitendfullscreen",function(){i.driver.currentTime=e.currentTime}),e.addEventListener("seeking",function(){A.indexOf(100*e.currentTime|0)<0&&(i.driver.currentTime=e.currentTime)}))}function l(e){var r=e[h];e[E]=e.play,e[T]=e.pause,e.play=c,e.pause=v,i(e,"paused",r.driver),i(e,"muted",r.driver,!0),i(e,"playbackRate",r.driver,!0),i(e,"ended",r.driver),i(e,"loop",r.driver,!0),n(e,"seeking"),n(e,"seeked"),n(e,"timeupdate",b,!1),n(e,"ended",b,!1)}function f(e,r,n){void 0===r&&(r=!0),void 0===n&&(n=!0),n&&!g||e[h]||(p(e,r),l(e),e.classList.add("IIV"),!r&&e.autoplay&&e.play(),/iPhone|iPod|iPad/.test(navigator.platform)||console.warn("iphone-inline-video is not guaranteed to work in emulated environments"))}var m,y="undefined"==typeof Symbol?function(e){return"@"+(e||"@")+Math.random()}:Symbol,g=/iPhone|iPod/i.test(navigator.userAgent)&&!matchMedia("(-webkit-video-playable-inline)").matches,h=y(),b=y(),E=y("nativeplay"),T=y("nativepause"),A=[],k=0;return f.isWhitelisted=g,f}();
-/**
- * @file A fantasy name generator library.
- * @version 1.0.0
- * @license Public Domain
- *
- * This library is designed after the RinkWorks Fantasy Name Generator.
- * @see http://www.rinkworks.com/namegen/
- *
- * @example
- * var generator = NameGen.compile("sV'i");
- * generator.toString();  // Emits a new name on each call
- * // => "entheu'loaf"
- *
- * ## Pattern Syntax
- *
- *   The compile() function creates a name generator based on an input
- * pattern. The letters s, v, V, c, B, C, i, m, M, D, and d represent
- * different types of random replacements. Everything else is emitted
- * literally.
- *
- *   s - generic syllable
- *   v - vowel
- *   V - vowel or vowel combination
- *   c - consonant
- *   B - consonant or consonant combination suitable for beginning a word
- *   C - consonant or consonant combination suitable anywhere in a word
- *   i - insult
- *   m - mushy name
- *   M - mushy name ending
- *   D - consonant suited for a stupid person's name
- *   d - syllable suited for a stupid person's name (begins with a vowel)
- *
- *   All characters between parenthesis () are emitted literally. For
- * example, the pattern "s(dim)", emits a random generic syllable
- * followed by "dim".
- *
- *   Characters between angle brackets <> emit patterns from the table
- * above. Imagine the entire pattern is wrapped in one of these.
- *
- *   In both types of groupings, a vertical bar | denotes a random
- * choice. Empty groups are allowed. For example, "(foo|bar)" emits
- * either "foo" or "bar". The pattern "<c|v|>" emits a constant,
- * vowel, or nothing at all.
- *
- *   An exclamation point ! means to capitalize the component that
- * follows it. For example, "!(foo)" will emit "Foo" and "v!s" will
- * emit a lowercase vowel followed by a capitalized syllable, like
- * "eRod".
- *
- *   A tilde ~ means to reverse the letters of the component that
- * follows it. For example, "~(foo)" will emit "oof". To reverse an
- * entire template, wrap it in brackets. For example, to reverse
- * "sV'i" as a whole use "~<sV'i>". The template "~sV'i" will only
- * reverse the initial syllable.
- *
- * ## Internals
- *
- *   A name generator is anything with a toString() method, including,
- * importantly, strings themselves. The generator constructors
- * (Random, Sequence) perform additional optimizations when *not* used
- * with the `new` keyword: they may pass through a provided generator,
- * combine provided generators, or even return a simple string.
- *
- *   New pattern symbols added to NameGen.symbols will automatically
- * be used by the compiler.
- */
-
-/**
- * Number of generated output possibilities (generator function).
- * @returns {number}
- * @method
- */
-String.prototype.combinations = function() { return 1; };
-
-/**
- * Longest possible output length (generator function).
- * @returns {number}
- * @method
- */
-String.prototype.min = function() { return this.length; };
-
-/**
- * Shortest possible output length (generator function).
- * @returns {number}
- * @method
- */
-String.prototype.max = function() { return this.length; };
-
-/**
- * List all possible outputs (generator function).
- * @returns {Array} An array of output strings.
- * @method
- */
-String.prototype.enumerate = function() { return [String(this)]; };
-
-/**
- * @namespace NameGen Everything relevant to the name generators.
- */
-var NameGen = NameGen || {};
-
-/**
- * Strings generated by the symbol generators.
- */
-NameGen.symbols = {
-    s: ['ach', 'ack', 'ad', 'age', 'ald', 'ale', 'an', 'ang', 'ar', 'ard',
-        'as', 'ash', 'at', 'ath', 'augh', 'aw', 'ban', 'bel', 'bur', 'cer',
-        'cha', 'che', 'dan', 'dar', 'del', 'den', 'dra', 'dyn', 'ech', 'eld',
-        'elm', 'em', 'en', 'end', 'eng', 'enth', 'er', 'ess', 'est', 'et',
-        'gar', 'gha', 'hat', 'hin', 'hon', 'ia', 'ight', 'ild', 'im', 'ina',
-        'ine', 'ing', 'ir', 'is', 'iss', 'it', 'kal', 'kel', 'kim', 'kin',
-        'ler', 'lor', 'lye', 'mor', 'mos', 'nal', 'ny', 'nys', 'old', 'om',
-        'on', 'or', 'orm', 'os', 'ough', 'per', 'pol', 'qua', 'que', 'rad',
-        'rak', 'ran', 'ray', 'ril', 'ris', 'rod', 'roth', 'ryn', 'sam',
-        'say', 'ser', 'shy', 'skel', 'sul', 'tai', 'tan', 'tas', 'ther',
-        'tia', 'tin', 'ton', 'tor', 'tur', 'um', 'und', 'unt', 'urn', 'usk',
-        'ust', 'ver', 'ves', 'vor', 'war', 'wor', 'yer'],
-    v: ['a', 'e', 'i', 'o', 'u', 'y'],
-    V: ['a', 'e', 'i', 'o', 'u', 'y', 'ae', 'ai', 'au', 'ay', 'ea', 'ee',
-        'ei', 'eu', 'ey', 'ia', 'ie', 'oe', 'oi', 'oo', 'ou', 'ui'],
-    c: ['b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'q', 'r',
-        's', 't', 'v', 'w', 'x', 'y', 'z'],
-    B: ['b', 'bl', 'br', 'c', 'ch', 'chr', 'cl', 'cr', 'd', 'dr', 'f', 'g',
-        'h', 'j', 'k', 'l', 'll', 'm', 'n', 'p', 'ph', 'qu', 'r', 'rh', 's',
-        'sch', 'sh', 'sl', 'sm', 'sn', 'st', 'str', 'sw', 't', 'th', 'thr',
-        'tr', 'v', 'w', 'wh', 'y', 'z', 'zh'],
-    C: ['b', 'c', 'ch', 'ck', 'd', 'f', 'g', 'gh', 'h', 'k', 'l', 'ld', 'll',
-        'lt', 'm', 'n', 'nd', 'nn', 'nt', 'p', 'ph', 'q', 'r', 'rd', 'rr',
-        'rt', 's', 'sh', 'ss', 'st', 't', 'th', 'v', 'w', 'y', 'z'],
-    i: ['air', 'ankle', 'ball', 'beef', 'bone', 'bum', 'bumble', 'bump',
-        'cheese', 'clod', 'clot', 'clown', 'corn', 'dip', 'dolt', 'doof',
-        'dork', 'dumb', 'face', 'finger', 'foot', 'fumble', 'goof',
-        'grumble', 'head', 'knock', 'knocker', 'knuckle', 'loaf', 'lump',
-        'lunk', 'meat', 'muck', 'munch', 'nit', 'numb', 'pin', 'puff',
-        'skull', 'snark', 'sneeze', 'thimble', 'twerp', 'twit', 'wad',
-        'wimp', 'wipe'],
-    m: ['baby', 'booble', 'bunker', 'cuddle', 'cuddly', 'cutie', 'doodle',
-        'foofie', 'gooble', 'honey', 'kissie', 'lover', 'lovey', 'moofie',
-        'mooglie', 'moopie', 'moopsie', 'nookum', 'poochie', 'poof',
-        'poofie', 'pookie', 'schmoopie', 'schnoogle', 'schnookie',
-        'schnookum', 'smooch', 'smoochie', 'smoosh', 'snoogle', 'snoogy',
-        'snookie', 'snookum', 'snuggy', 'sweetie', 'woogle', 'woogy',
-        'wookie', 'wookum', 'wuddle', 'wuddly', 'wuggy', 'wunny'],
-    M: ['boo', 'bunch', 'bunny', 'cake', 'cakes', 'cute', 'darling',
-        'dumpling', 'dumplings', 'face', 'foof', 'goo', 'head', 'kin',
-        'kins', 'lips', 'love', 'mush', 'pie', 'poo', 'pooh', 'pook', 'pums'],
-    D: ['b', 'bl', 'br', 'cl', 'd', 'f', 'fl', 'fr', 'g', 'gh', 'gl', 'gr',
-        'h', 'j', 'k', 'kl', 'm', 'n', 'p', 'th', 'w'],
-    d: ['elch', 'idiot', 'ob', 'og', 'ok', 'olph', 'olt', 'omph', 'ong',
-        'onk', 'oo', 'oob', 'oof', 'oog', 'ook', 'ooz', 'org', 'ork', 'orm',
-        'oron', 'ub', 'uck', 'ug', 'ulf', 'ult', 'um', 'umb', 'ump', 'umph',
-        'un', 'unb', 'ung', 'unk', 'unph', 'unt', 'uzz']
-};
-
-/**
- * Return true if the given thing is a string.
- * @param object - The object to be tested
- * @returns {boolean}
- * @private
- */
-NameGen._isString = function(object) {
-    return Object.prototype.toString.call(object) === '[object String]';
-};
-
-/**
- * Combine adjacent strings in the array.
- * @param {Array} array - The array to be compressed (unmodified)
- * @returns {Array} A new array with the strings compressed
- * @private
- */
-NameGen._compress = function(array) {
-    var emit = [], accum = [];
-    function dump() {
-        if (accum.length > 0) {
-            emit.push(accum.join(''));
-            accum.length = 0;
-        }
-    }
-    for (var i = 0; i < array.length; i++) {
-        if (NameGen._isString(array[i])) {
-            accum.push(array[i]);
-        } else {
-            dump();
-            emit.push(array[i]);
-        }
-    }
-    dump();
-    return emit;
-};
-
-/**
- * @param {string} string
- * @returns {string}
- */
-NameGen._capitalize = function(string) {
-    return string.replace(/^./, function(c) {
-        return c.toUpperCase();
-    });
-};
-
-/**
- * @param {string} string
- * @returns {string}
- */
-NameGen._reverse = function(string) {
-    return string.split(/(?:)/).reverse().join('');
-};
-
-/**
- * When emitting, selects a random generator.
- * @param {Array} generators - An array of name generators
- * @returns A name generator, not necessarily a new one
- * @constructor
- */
-NameGen.Random = function Random(generators) {
-    if (!(this instanceof NameGen.Random)) {
-        switch (generators.length) {
-        case 0:
-            return '';
-        case 1:
-            return generators[0];
-        default:
-            return new NameGen.Random(generators);
-        }
-    }
-    this.sub = generators;
-    return this;
-};
-
-/**
- * Generate a new name.
- * @returns {string}
- * @method
- */
-NameGen.Random.prototype.toString = function() {
-    if (this.sub.length > 0) {
-        var i = Math.floor(Math.random() * this.sub.length);
-        return this.sub[i].toString();
-    } else {
-        return '';
-    }
-};
-
-/**
- * Number of generated output possibilities (generator function).
- * @returns {number}
- * @method
- */
-NameGen.Random.prototype.combinations = function() {
-    return Math.max(1, this.sub.reduce(function(total, g) {
-        return total + g.combinations();
-    }, 0));
-};
-
-/**
- * Shortest possible output length (generator function).
- * @returns {number}
- * @method
- */
-NameGen.Random.prototype.min = function() {
-    return Math.min.apply(null, this.sub.map(function(g) {
-        return g.min();
-    }));
-};
-
-/**
- * Longest possible output length (generator function).
- * @returns {number}
- * @method
- */
-NameGen.Random.prototype.max = function() {
-    return Math.max.apply(null, this.sub.map(function(g) {
-        return g.max();
-    }));
-};
-
-/**
- * Enumerate all possible outputs.
- * @returns {Array} An array of all possible outputs.
- * @method
- */
-NameGen.Random.prototype.enumerate = function() {
-    var enums = this.sub.map(function(g) { return g.enumerate(); });
-    return Array.prototype.concat.apply(enums[0], enums.slice(1));
-};
-
-/**
- * Runs each provided generator in turn when generating.
- * @param {Array} generators - An array of name generators
- * @returns A name generator, not necessarily a new one
- * @constructor
- */
-NameGen.Sequence = function Sequence(generators) {
-    generators = NameGen._compress(generators);
-    if (!(this instanceof NameGen.Sequence)) {
-        switch (generators.length) {
-        case 0:
-            return '';
-        case 1:
-            return generators[0];
-        default:
-            return new NameGen.Sequence(generators);
-        }
-    }
-    this.sub = generators;
-    return this;
-};
-
-/**
- * Generate a new name.
- * @returns {string}
- * @method
- */
-NameGen.Sequence.prototype.toString = function() {
-    return this.sub.join('');
-};
-
-/**
- * Number of generated output possibilities (generator function).
- * @returns {number}
- * @method
- */
-NameGen.Sequence.prototype.combinations = function() {
-    return this.sub.reduce(function(total, g) {
-        return total * g.combinations();
-    }, 1);
-};
-
-/**
- * Shortest possible output length (generator function).
- * @returns {number}
- * @method
- */
-NameGen.Sequence.prototype.min = function() {
-    return this.sub.reduce(function(total, g) {
-        return total + g.min();
-    }, 0);
-};
-
-/**
- * Longest possible output length (generator function).
- * @returns {number}
- * @method
- */
-NameGen.Sequence.prototype.max = function() {
-    return this.sub.reduce(function(total, g) {
-        return total + g.max();
-    }, 0);
-};
-
-/**
- * Enumerate all possible outputs.
- * @returns {Array} An array of all possible outputs.
- * @method
- */
-NameGen.Sequence.prototype.enumerate = function() {
-    var enums = this.sub.map(function(g) { return g.enumerate(); });
-    function enumerate(enums, prefix) {
-        if (enums.length === 1) {
-            return enums[0].map(function(e) {
-                return prefix + e;
-            });
-        } else {
-            var output = [];
-            var rest = enums.slice(1);
-            for (var i = 0; i < enums[0].length; i++) {
-                output.push(enumerate(rest, prefix + enums[0][i]));
-            }
-            return Array.prototype.concat.apply([], output);
-        }
-    }
-    return enumerate(enums, '');
-};
-
-/**
- * Create a new type of generator based on a string transform function.
- * @param {Function} f
- */
-NameGen.fromTransform = function(f) {
-    function G(generator) {
-        if (!(this instanceof G)) {
-            if (NameGen._isString(generator)) {
-                return f(generator);
-            } else {
-                return new G(generator);
-            }
-        }
-        this.generator = generator;
-        return this;
-    }
-
-    G.prototype.toString = function() {
-        return f(this.generator.toString());
-    };
-    G.prototype.combinations = function() {
-        return this.generator.combinations();
-    };
-    G.prototype.min = function() {
-        return this.generator.min();
-    };
-    G.prototype.max = function() {
-        return this.generator.max();
-    };
-    G.prototype.enumerate = function() {
-        return this.generator.enumerate().map(f);
-    };
-
-    return G;
-};
-
-/**
- * Decorate a generator by capitalizing its output.
- * @constructor
- */
-NameGen.Capitalizer = NameGen.fromTransform(NameGen._capitalize);
-
-/**
- * Decorate a generator by reversing its output.
- * @constructor
- */
-NameGen.Reverser = NameGen.fromTransform(NameGen._reverse);
-
-/* Everything below here is the compiler. */
-
-/**
- * Builds up a generator grouping in the compiler.
- * @constructor
- */
-NameGen._Group = function() {
-    this.set = [[]];
-    this.wrappers = [];
-};
-
-/**
- * @param g The generator to add to this group
- * @returns This object
- */
-NameGen._Group.prototype.add = function(g) {
-    while (this.wrappers.length > 0) {
-        var type = this.wrappers.pop();
-        g = type(g);
-    }
-    this.set[this.set.length - 1].push(g);
-    return this;
-};
-
-/**
- * Start a new grouping in this generator group.
- * @returns This object
- */
-NameGen._Group.prototype.split = function() {
-    this.set.push([]);
-    return this;
-};
-
-/**
- * Wrap the next added generator with this decorator.
- * @param type The type of the decorator to wrap.
- * @returns This object
- */
-NameGen._Group.prototype.wrap = function(type) {
-    this.wrappers.push(type);
-    return this;
-};
-
-/**
- * @returns A generator built from this grouping.
- */
-NameGen._Group.prototype.emit = function() {
-    return NameGen.Random(this.set.map(NameGen.Sequence));
-};
-
-/**
- * Builds up a literal grouping in the compiler.
- * @constructor
- */
-NameGen._Literal = function() {
-    NameGen._Group.call(this);
-};
-NameGen._Literal.prototype = Object.create(NameGen._Group.prototype);
-
-/**
- * Builds up a symbolic grouping in the compiler.
- * @constructor
- */
-NameGen._Symbol = function() {
-    NameGen._Group.call(this);
-};
-NameGen._Symbol.prototype = Object.create(NameGen._Group.prototype);
-
-/**
- * Add a new generator based on a character.
- * @param c The generator's symbol
- * @returns This object
- */
-NameGen._Symbol.prototype.add = function(g, literal) {
-    if (!literal) {
-        g = NameGen.Random(NameGen.symbols[g] || [g]);
-    }
-    NameGen._Group.prototype.add.call(this, g);
-    return this;
-};
-
-/**
- * Compile a generator specification string into a generator.
- * @param {string} input - The pattern string to compile
- * @returns A name generator
- */
-NameGen.compile = function(input) {
-    var stack = [];
-    stack.top = function() {
-        return stack[stack.length - 1];
-    };
-
-    stack.push(new NameGen._Symbol());
-    for (var i = 0; i < input.length; i++) {
-        var c = input[i];
-        switch (c) {
-        case '<':
-            stack.push(new NameGen._Symbol());
-            break;
-        case '(':
-            stack.push(new NameGen._Literal());
-            break;
-        case '>':
-        case ')':
-            if (stack.length === 1) {
-                throw new Error('Unbalanced brackets.');
-            } else if (c === '>' && stack.top() instanceof NameGen._Literal) {
-                throw new Error('Unexpected ">" in input.');
-            } else if (c === ')' && stack.top() instanceof NameGen._Symbol) {
-                throw new Error('Unexpected ")" in input.');
-            }
-            var last = stack.pop().emit();
-            stack.top().add(last, true);
-            break;
-        case '|':
-            stack.top().split();
-            break;
-        case '!':
-            if (stack.top() instanceof NameGen._Symbol) {
-                stack.top().wrap(NameGen.Capitalizer);
-            } else {
-                stack.top().add(c);
-            }
-            break;
-        case '~':
-            if (stack.top() instanceof NameGen._Symbol) {
-                stack.top().wrap(NameGen.Reverser);
-            } else {
-                stack.top().add(c);
-            }
-            break;
-        default:
-            stack.top().add(c);
-            break;
-        }
-    }
-    if (stack.length !== 1) {
-        throw new Error('Missing closing bracket.');
-    } else {
-        return stack.top().emit();
-    }
-};
-
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
 'use strict';
 /* eslint-disable no-unused-vars */
@@ -55836,6 +55272,14 @@ function colored(geometry, color, options) {
     obj.material = mat;
   }
 
+  if (options.shadow) {
+    obj.receiveShadow = true;
+    obj.castShadow = true;
+  }
+
+  if (options.resolve) {
+    options.resolve();
+  }
   return obj;
 }
 if(typeof window !== "undefined") window.colored = colored;
@@ -56513,10 +55957,12 @@ function range(n, m, s, t) {
   var n2 = s && n || 0,
       m2 = s && m || n,
       s2 = t && s || 1,
-      t2 = t || s || m;
+      t2 = t || s || m,
+      output = [];
   for (var i = n2; i < m2; i += s2) {
-    t2(i);
+    output.push(t2(i));
   }
+  return output;
 }
 if(typeof window !== "undefined") window.range = range;
 })();
@@ -56705,6 +56151,11 @@ function textured(geometry, txt, options) {
 
   if (txt instanceof Primrose.Surface) {
     obj.surface = txt;
+  }
+
+  if (options.shadow) {
+    obj.receiveShadow = true;
+    obj.castShadow = true;
   }
 
   if (options.txtRepeatS * options.txtRepeatT > 1) {
@@ -57006,6 +56457,9 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
     _this.network = null;
     _this.options = patch(options, BrowserEnvironment.DEFAULTS);
     _this.options.foregroundColor = _this.options.foregroundColor || complementColor(new THREE.Color(_this.options.backgroundColor)).getHex();
+    if (_this.options.nonstandardIPD !== null) {
+      _this.options.nonstandardIPD *= 0.5;
+    }
 
     _this.audioQueue = [];
 
@@ -57023,7 +56477,6 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
       movePlayer(dt);
       moveUI();
       doPicking();
-      moveSky();
       moveGround();
       if (_this.network) {
         _this.network.update(dt);
@@ -57036,16 +56489,16 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
       _this.input.update(dt);
     };
 
-    var uiTurn = 0;
+    _this.turns = 0;
     var followEuler = new THREE.Euler(),
         maxX = -Math.PI / 4,
         maxY = Math.PI / 6;
 
     var moveUI = function moveUI(dt) {
-      _this.ui.position.copy(_this.input.head.position);
+      _this.ui.position.copy(_this.input.stage.position);
       followEuler.setFromQuaternion(_this.input.head.quaternion);
       var turn = followEuler.y,
-          deltaTurnA = turn - uiTurn,
+          deltaTurnA = turn - _this.turns,
           deltaTurnB = deltaTurnA + Math.PI * 2,
           deltaTurnC = deltaTurnA - Math.PI * 2,
           deltaTurn = void 0;
@@ -57062,10 +56515,10 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
       }
 
       if (Math.abs(deltaTurn) > maxY) {
-        uiTurn += deltaTurn * 0.02;
+        _this.turns += deltaTurn * 0.02;
       }
 
-      followEuler.set(maxX, uiTurn, 0, "YXZ");
+      followEuler.set(maxX, _this.turns, 0, "YXZ");
       _this.ui.quaternion.setFromEuler(followEuler);
     };
 
@@ -57086,14 +56539,16 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
       }));
     };
 
-    var moveSky = function moveSky() {
-      _this.sky.position.copy(_this.input.head.position);
-    };
-
     var moveGround = function moveGround() {
+      if (_this.sky) {
+        _this.sky.position.set(_this.input.head.position.x, 0, _this.input.head.position.z);
+      }
+
       if (_this.ground) {
         _this.ground.position.set(Math.floor(_this.input.head.position.x), GROUND_HEIGHT, Math.floor(_this.input.head.position.z));
-        _this.ground.material.needsUpdate = true;
+        if (_this.ground.material) {
+          _this.ground.material.needsUpdate = true;
+        }
       }
     };
 
@@ -57119,6 +56574,15 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
           var st = trans[i],
               v = st.viewport,
               side = 2 * i - 1;
+          if (_this.options.nonstandardIPD !== null) {
+            st.translation.x = Math.sign(st.translation.x) * _this.options.nonstandardIPD;
+          }
+          if (_this.options.nonstandardNeckLength !== null) {
+            st.translation.y = _this.options.nonstandardNeckLength;
+          }
+          if (_this.options.nonstandardNeckDepth !== null) {
+            st.translation.z = _this.options.nonstandardNeckDepth;
+          }
           Primrose.Entity.eyeBlankAll(i);
           _this.camera.projectionMatrix.copy(st.projection);
           _this.camera.translateOnAxis(st.translation, 1);
@@ -57145,7 +56609,7 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
     var modifyScreen = function modifyScreen() {
       var near = _this.options.nearPlane,
           far = near + _this.options.drawDistance,
-          p = _this.input.VR.getTransforms(near, far);
+          p = _this.input && _this.input.VR && _this.input.VR.getTransforms(near, far);
 
       if (p) {
         var canvasWidth = 0,
@@ -57157,9 +56621,7 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
         }
 
         _this.input.Mouse.commands.U.scale = 2 / canvasWidth;
-        _this.input.Mouse.commands.U.offset = -1;
         _this.input.Mouse.commands.V.scale = 2 / canvasHeight;
-        _this.input.Mouse.commands.V.offset = -1;
 
         canvasWidth = Math.floor(canvasWidth * resolutionScale);
         canvasHeight = Math.floor(canvasHeight * resolutionScale);
@@ -57371,39 +56833,39 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
         START_POINT = new THREE.Vector3();
 
     _this.selectControl = function (evt) {
-      var hit = evt.hit || evt.lastHit,
+      var hit = evt.hit,
           obj = hit && hit.object;
 
-      if (evt.type === "exit" && evt.lastHit && evt.lastHit.object === _this.ground) {
-        evt.pointer.disk.visible = false;
-      }
+      if (_this.ground && obj === _this.ground) {
+        if (evt.type === "exit") {
+          evt.pointer.disk.visible = false;
+        } else if (evt.type !== "exit") {
+          POSITION.copy(evt.hit.point).sub(_this.input.head.position);
 
-      if (evt.type !== "exit" && evt.hit && obj === _this.ground) {
-        POSITION.copy(evt.hit.point).sub(_this.input.head.position);
+          var distSq = POSITION.x * POSITION.x + POSITION.z * POSITION.z;
+          if (distSq > MAX_MOVE_DISTANCE_SQ) {
+            var dist = Math.sqrt(distSq),
+                factor = MAX_MOVE_DISTANCE / dist,
+                y = POSITION.y;
+            POSITION.y = 0;
+            POSITION.multiplyScalar(factor);
+            POSITION.y = y;
+          }
 
-        var distSq = POSITION.x * POSITION.x + POSITION.z * POSITION.z;
-        if (distSq > MAX_MOVE_DISTANCE_SQ) {
-          var dist = Math.sqrt(distSq),
-              factor = MAX_MOVE_DISTANCE / dist,
-              y = POSITION.y;
-          POSITION.y = 0;
-          POSITION.multiplyScalar(factor);
-          POSITION.y = y;
-        }
+          POSITION.add(_this.input.head.position);
 
-        POSITION.add(_this.input.head.position);
-
-        if (evt.type === "enter") {
-          evt.pointer.disk.visible = true;
-        } else if (evt.type === "pointerstart" || evt.type === "gazestart") {
-          START_POINT.copy(POSITION);
-        } else if (evt.type === "pointermove" || evt.type === "gazemove") {
-          evt.pointer.moveTeleportPad(POSITION);
-        } else if (evt.type === "pointerend" || evt.type === "gazecomplete") {
-          START_POINT.sub(POSITION);
-          var len = START_POINT.lengthSq();
-          if (len < 0.01) {
-            _this.teleport(POSITION);
+          if (evt.type === "enter") {
+            evt.pointer.disk.visible = true;
+          } else if (evt.type === "pointerstart" || evt.type === "gazestart") {
+            START_POINT.copy(POSITION);
+          } else if (evt.type === "pointermove" || evt.type === "gazemove") {
+            evt.pointer.moveTeleportPad(POSITION);
+          } else if (evt.type === "pointerend" || evt.type === "gazecomplete") {
+            START_POINT.sub(POSITION);
+            var len = START_POINT.lengthSq();
+            if (len < 0.01) {
+              _this.teleport(POSITION);
+            }
           }
         }
       }
@@ -57431,10 +56893,10 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
         } else {
           console.log(_this.currentControl);
         }
-      } else {
-        var handler = obj && obj["on" + evt.type];
+      } else if (obj) {
+        var handler = obj["on" + evt.type];
         if (handler) {
-          handler(app);
+          handler(evt);
         }
       }
     };
@@ -57445,49 +56907,68 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
     }
 
     _this.camera = new THREE.PerspectiveCamera(75, 1, _this.options.nearPlane, _this.options.nearPlane + _this.options.drawDistance);
-    if (_this.options.skyTexture === undefined) {
-      _this.options.skyTexture = _this.options.backgroundColor;
-    }
-    var skyFunc = typeof _this.options.skyTexture === "number" ? colored : textured,
-        skyDim = _this.options.drawDistance * 0.9,
-        skyGeom = null,
-        onSkyDone = function onSkyDone() {
-      return _this.scene.add(_this.sky);
-    };
-    if (typeof _this.options.skyTexture === "string") {
-      skyGeom = sphere(skyDim, 18, 9);
-    } else {
-      skyGeom = box(skyDim, skyDim, skyDim);
-    }
-    _this.sky = skyFunc(skyGeom, _this.options.skyTexture, {
-      side: THREE.BackSide,
-      unshaded: true,
-      transparent: true,
-      opacity: 1,
-      resolve: onSkyDone,
-      progress: _this.options.progress
-    });
-    _this.sky.name = "Sky";
 
-    if (_this.options.groundTexture !== undefined) {
-      var dim = 10,
-          gm = new THREE.BoxBufferGeometry(dim * 5, 0.1, dim * 5, dim, 1, dim);
-      var groundFunc = typeof _this.options.groundTexture === "number" ? colored : textured;
-      _this.ground = groundFunc(gm, _this.options.groundTexture, {
-        txtRepeatS: dim * 5,
-        txtRepeatT: dim * 5
+    var skyReady = null;
+    if (_this.options.skyTexture !== null) {
+      skyReady = new Promise(function (resolve, reject) {
+        var skyFunc = typeof _this.options.skyTexture === "number" ? colored : textured,
+            skyDim = _this.options.drawDistance * 0.9;
+
+        var skyGeom = null;
+        if (typeof _this.options.skyTexture === "string") {
+          skyGeom = sphere(skyDim, 18, 9);
+        } else {
+          skyGeom = box(skyDim, skyDim, skyDim);
+        }
+
+        _this.sky = skyFunc(skyGeom, _this.options.skyTexture, {
+          side: THREE.BackSide,
+          unshaded: true,
+          transparent: true,
+          opacity: 1,
+          resolve: resolve,
+          progress: _this.options.progress
+        });
       });
+    } else {
+      _this.sky = hub();
+      skyReady = Promise.resolve();
+    }
+
+    skyReady = skyReady.then(function () {
+      console.log(_this.sky);
+      _this.sky.name = "Sky";
+      _this.scene.add(_this.sky);
+    });
+
+    var groundReady = null;
+    if (_this.options.groundTexture !== null) {
+      groundReady = new Promise(function (resolve, reject) {
+        var dim = _this.options.drawDistance / Math.sqrt(2),
+            gm = new THREE.BoxBufferGeometry(dim * 5, 0.1, dim * 5, dim, 1, dim),
+            groundFunc = typeof _this.options.groundTexture === "number" ? colored : textured;
+        _this.ground = groundFunc(gm, _this.options.groundTexture, {
+          txtRepeatS: dim * 5,
+          txtRepeatT: dim * 5,
+          transparent: true,
+          opacity: 1,
+          resolve: resolve,
+          progress: _this.options.progress
+        });
+        _this.registerPickableObject(_this.ground);
+      });
+    } else {
+      _this.ground = hub();
+      groundReady = Promise.resolve();
+    }
+
+    groundReady = groundReady.then(function () {
       _this.ground.name = "Ground";
       _this.scene.add(_this.ground);
-      _this.registerPickableObject(_this.ground);
-    }
+    });
 
     _this.ui = new THREE.Object3D();
     _this.scene.add(_this.ui);
-
-    if (_this.passthrough) {
-      _this.camera.add(_this.passthrough.mesh);
-    }
 
     var buildScene = function buildScene(sceneGraph) {
       sceneGraph.buttons = [];
@@ -57501,10 +56982,16 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
       });
       _this.scene.add.apply(_this.scene, sceneGraph.children);
       _this.scene.traverse(function (obj) {
-        if (_this.options.disableDefaultLighting && obj.material && obj.material.map) {
-          textured(obj, obj.material.map, {
-            unshaded: true
-          });
+        if (_this.options.disableDefaultLighting && obj.material) {
+          if (obj.material.map) {
+            textured(obj, obj.material.map, {
+              unshaded: true
+            });
+          } else {
+            colored(obj, obj.material.color.getHex(), {
+              unshaded: true
+            });
+          }
         }
         if (obj.name) {
           _this.scene[obj.name] = obj;
@@ -57540,7 +57027,7 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
     _this.goFullScreen = function (index, evt) {
       if (evt !== "Gaze") {
         var _ret = function () {
-          var elem = !_this.input.VR.isStereo || isMobile && !_this.input.VR.isNativeMobileWebVR ? _this.options.fullscreenElement : _this.renderer.domElement;
+          var elem = !_this.input.VR.isStereo || isMobile && !_this.input.VR.isNativeMobileWebVR ? _this.options.fullScreenElement : _this.renderer.domElement;
           _this.input.VR.connect(index);
           return {
             v: _this.input.VR.requestPresent([{
@@ -57570,7 +57057,7 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
 
     PointerLock.addChangeListener(function (evt) {
       if (_this.input.VR.isPresenting && !PointerLock.isActive) {
-        _this.input.VR.cancel();
+        _this.input.cancelVR();
       }
     });
 
@@ -57583,7 +57070,7 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
       _this.input.Mouse.commands.heading.scale = presenting ? -1 : 1;
       _this.input.Mouse.commands.pitch.scale = presenting ? -1 : 1;
       if (!presenting) {
-        _this.input.VR.cancel();
+        _this.input.cancelVR();
       }
       modifyScreen();
     };
@@ -57612,8 +57099,7 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
         }
       }
 
-      _this.options.fullscreenElement = document.querySelector(_this.options.fullscreenElement) || _this.renderer.domElement;
-
+      _this.options.fullScreenElement = document.querySelector(_this.options.fullScreenElement) || _this.renderer.domElement;
       var maxTabIndex = 0;
       var elementsWithTabIndex = document.querySelectorAll("[tabIndex]");
       for (var i = 0; i < elementsWithTabIndex.length; ++i) {
@@ -57624,7 +57110,7 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
       _this.renderer.domElement.addEventListener('webglcontextlost', _this.stop, false);
       _this.renderer.domElement.addEventListener('webglcontextrestored', _this.start, false);
 
-      _this.input = new Primrose.Input.FPSInput(_this.renderer.domElement, _this.options);
+      _this.input = new Primrose.Input.FPSInput(_this.options.fullScreenElement, _this.options);
       _this.input.addEventListener("zero", _this.zero, false);
       _this.input.VR.ready.then(function (displays) {
         return displays.forEach(function (display, i) {
@@ -57633,7 +57119,7 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
               (function () {
                 var exitVR = function exitVR() {
                   window.removeEventListener("vrdisplaydeactivate", exitVR);
-                  _this.input.VR.cancel();
+                  _this.input.cancelVR();
                 };
                 window.addEventListener("vrdisplaydeactivate", exitVR, false);
                 _this.goFullScreen(i);
@@ -57656,7 +57142,7 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
         var keyDown = function keyDown(evt) {
           if (_this.input.VR.isPresenting) {
             if (evt.keyCode === Primrose.Keys.ESCAPE && !_this.input.VR.isPolyfilled) {
-              _this.input.VR.cancel();
+              _this.input.cancelVR();
             }
           }
 
@@ -57735,11 +57221,25 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
 
       _this.input.head.add(_this.camera);
 
-      return _this.input.ready;
+      return _this.input.ready.then(function () {
+        if (_this.options.fullScreenButtonContainer) {
+          _this.insertFullScreenButtons(_this.options.fullScreenButtonContainer);
+        }
+      });
     });
 
-    var allReady = Promise.all([modelsReady, documentReady]).then(function () {
+    var allReady = Promise.all([skyReady, groundReady, modelsReady, documentReady]).then(function () {
       _this.renderer.domElement.style.cursor = "default";
+      if (_this.options.enableShadows && _this.sun) {
+        _this.renderer.shadowMap.enabled = true;
+        _this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        _this.sun.castShadow = true;
+        _this.sun.shadow.mapSize.width = _this.sun.shadow.mapSize.height = _this.options.shadowMapSize;
+        if (_this.ground.material) {
+          _this.ground.receiveShadow = true;
+          _this.ground.castShadow = true;
+        }
+      }
       _this.input.VR.displays.forEach(function (display) {
         if (display.DOMElement !== undefined) {
           display.DOMElement = _this.renderer.domElement;
@@ -57787,7 +57287,7 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
 
     if (window.alert.toString().indexOf("native code") > -1) {
       // overwrite the native alert functions so they can't be called while in
-      // fullscreen VR mode.
+      // full screen VR mode.
 
       var rerouteDialog = function rerouteDialog(oldFunction, newFunction) {
         if (!newFunction) {
@@ -57847,6 +57347,8 @@ var BrowserEnvironment = function (_Primrose$AbstractEve) {
             isStereo = Primrose.Input.VR.isStereoDisplay(display),
             enterVR = _this2.goFullScreen.bind(_this2, i);
         btn.type = "button";
+        btn.className = isStereo ? "stereo" : "mono";
+        btn.title = display.displayName;
         btn.appendChild(document.createTextNode(display.displayName));
         btn.addEventListener("click", enterVR, false);
         container.appendChild(btn);
@@ -57877,6 +57379,8 @@ BrowserEnvironment.DEFAULTS = {
   avatarHeight: 1.65,
   walkSpeed: 2,
   disableKeyboard: false,
+  enableShadows: false,
+  shadowMapSize: 1024,
   // The acceleration applied to falling objects.
   gravity: 9.8,
   // The amount of time in seconds to require gazes on objects before triggering the gaze event.
@@ -57887,6 +57391,9 @@ BrowserEnvironment.DEFAULTS = {
   disableDefaultLighting: false,
   // The color that WebGL clears the background with before drawing.
   backgroundColor: 0xafbfff,
+  // the textures to use for the sky and ground
+  skyTexture: null,
+  groundTexture: null,
   // the near plane of the camera.
   nearPlane: 0.01,
   // the far plane of the camera.
@@ -57902,7 +57409,13 @@ BrowserEnvironment.DEFAULTS = {
   // A WebGL context to use, if one had already been created.
   context: null,
   // THREE.js scene, if one had already been created.
-  scene: null
+  scene: null,
+  // I highly suggest you don't go down the road that requires setting this. I will not help you understand what it does, because I would rather you just not use it.
+  nonstandardIPD: null,
+  // This is an experimental feature for setting the height of a user's "neck" on orientation-only systems (such as Google Cardboard and Samsung Gear VR) to create a more realistic feel.
+  nonstandardNeckLength: null,
+  nonstandardNeckDepth: null,
+  showHeadPointer: true
 };
 if(typeof window !== "undefined") window.Primrose.BrowserEnvironment = BrowserEnvironment;
 })();
@@ -58968,7 +58481,7 @@ var loaders = null,
   "text/prs.wavefront-obj": "obj",
   "text/prs.wavefront-mtl": "mtl"
 },
-    PATH_PATTERN = /((?:[^/]+\/)+)(\w+)(\.(?:\w+))$/,
+    PATH_PATTERN = /((?:https?:\/\/)?(?:[^/]+\/)+)(\w+)(\.(?:\w+))$/,
     EXTENSION_PATTERN = /(\.(?:\w+))+$/,
     NAME_PATTERN = /([^/]+)\.\w+$/;
 
@@ -59282,12 +58795,11 @@ var Pointer = function (_Primrose$AbstractEve) {
         VECTOR_TEMP.set(0, 0, 0);
         for (var i = 0; i < this.devices.length; ++i) {
           var obj = this.devices[i];
-          if (obj.enabled) {
-            VECTOR_TEMP.x += obj.getValue("U");
-            VECTOR_TEMP.y += obj.getValue("V");
+          if (obj.enabled && !obj.commands.U.disabled && !obj.commands.V.disabled) {
+            VECTOR_TEMP.x += obj.getValue("U") - 1;
+            VECTOR_TEMP.y += obj.getValue("V") - 1;
           }
         }
-
         VECTOR_TEMP.applyMatrix4(this.unproject).applyQuaternion(QUAT_TEMP);
         this.root.lookAt(VECTOR_TEMP);
       } else {
@@ -59336,11 +58848,15 @@ var Pointer = function (_Primrose$AbstractEve) {
             moved = lastHit && currentHit && (currentHit.point.x !== lastHit.point.x || currentHit.point.y !== lastHit.point.y || currentHit.point.z !== lastHit.point.z),
             dt = lastHit && lastHit.time && performance.now() - lastHit.time,
             changed = !lastHit && currentHit || lastHit && !currentHit || lastHit && currentHit && currentHit.object.id !== lastHit.object.id,
-            evt = {
+            enterEvt = {
           pointer: this,
           buttons: 0,
-          hit: currentHit,
-          lastHit: lastHit
+          hit: currentHit
+        },
+            leaveEvt = {
+          pointer: this,
+          buttons: 0,
+          hit: lastHit
         };
 
         if (currentHit) {
@@ -59366,61 +58882,63 @@ var Pointer = function (_Primrose$AbstractEve) {
         this.gazeInner.visible = this.useGaze;
         this.mesh.visible = !this.useGaze;
 
-        if (changed) {
-          if (lastHit) {
-            this.emit("exit", evt);
-          }
-          if (currentHit) {
-            this.emit("enter", evt);
-          }
-        }
-
         var dButtons = 0;
         for (var i = 0; i < this.triggerDevices.length; ++i) {
           var obj = this.triggerDevices[i];
           if (obj.enabled) {
-            evt.buttons |= obj.getValue("buttons");
+            enterEvt.buttons |= obj.getValue("buttons");
             dButtons |= obj.getValue("dButtons");
+          }
+        }
+
+        leaveEvt.buttons = enterEvt.buttons;
+
+        if (changed) {
+          if (lastHit) {
+            this.emit("exit", leaveEvt);
+          }
+          if (currentHit) {
+            this.emit("enter", enterEvt);
           }
         }
 
         var selected = false;
         if (dButtons) {
-          if (evt.buttons) {
-            this.emit("pointerstart", evt);
+          if (enterEvt.buttons) {
+            this.emit("pointerstart", enterEvt);
             if (lastHit) {
               lastHit.time = performance.now();
             }
           } else {
             selected = !!currentHit;
-            this.emit("pointerend", evt);
+            this.emit("pointerend", enterEvt);
           }
         } else if (moved) {
-          this.emit("pointermove", evt);
+          this.emit("pointermove", enterEvt);
         }
 
         if (this.useGaze) {
           if (changed) {
             if (dt !== null && dt < this.gazeTimeout) {
               this.gazeOuter.visible = false;
-              this.emit("gazecancel", evt);
+              this.emit("gazecancel", leaveEvt);
             }
             if (currentHit) {
               this.gazeOuter.visible = true;
-              this.emit("gazestart", evt);
+              this.emit("gazestart", enterEvt);
             }
           } else if (dt !== null) {
             if (dt >= this.gazeTimeout) {
               this.gazeOuter.visible = false;
               selected = !!currentHit;
-              this.emit("gazecomplete", evt);
+              this.emit("gazecomplete", enterEvt);
               lastHit.time = null;
             } else if (currentHit && currentHit.object && hasGazeEvent(currentHit.object)) {
               var p = Math.round(36 * dt / this.gazeTimeout),
                   a = 2 * Math.PI * p / 36;
               this.gazeOuter.geometry = ring(GAZE_RING_INNER, GAZE_RING_OUTER, 36, p, 0, a);
               if (moved) {
-                this.emit("gazemove", evt);
+                this.emit("gazemove", enterEvt);
               }
             } else {
               if (currentHit && currentHit.object) {
@@ -59432,7 +58950,7 @@ var Pointer = function (_Primrose$AbstractEve) {
         }
 
         if (selected) {
-          this.emit("select", evt);
+          this.emit("select", enterEvt);
         }
 
         if (changed) {
@@ -61418,8 +60936,8 @@ var FPSInput = function (_Primrose$AbstractEve) {
     }));
 
     _this.add(new Primrose.Input.Mouse(DOMElement, {
-      U: { axes: ["X"], min: -1, max: 1 },
-      V: { axes: ["Y"], min: -1, max: 1 },
+      U: { axes: ["X"], min: 0, max: 2, offset: 0 },
+      V: { axes: ["Y"], min: 0, max: 2 },
       buttons: {
         axes: ["BUTTONS"]
       },
@@ -61624,7 +61142,7 @@ var FPSInput = function (_Primrose$AbstractEve) {
         this.Mouse.inPhysicalUse = false;
       }
 
-      this.head.showPointer = this.VR.hasOrientation;
+      this.head.showPointer = this.VR.hasOrientation && this.options.showHeadPointer;
       this.mousePointer.showPointer = (this.hasMouse || this.hasGamepad) && !this.hasMotionControllers;
 
       if (this.Keyboard) {
@@ -61670,14 +61188,11 @@ var FPSInput = function (_Primrose$AbstractEve) {
           pitch = 0,
           strafe = 0,
           drive = 0,
-          lift = 0,
-          mouseHeading = 0;
+          lift = 0;
       for (var i = 0; i < this.managers.length; ++i) {
         var mgr = this.managers[i];
         if (mgr.enabled) {
-          if (mgr.name === "Mouse") {
-            mouseHeading += mgr.getValue("heading");
-          } else {
+          if (mgr.name !== "Mouse") {
             heading += mgr.getValue("heading");
           }
           pitch += mgr.getValue("pitch");
@@ -61687,12 +61202,21 @@ var FPSInput = function (_Primrose$AbstractEve) {
         }
       }
 
-      if (this.VR.hasOrientation) {
-        mouseHeading = WEDGE * Math.floor(mouseHeading / WEDGE + 0.5);
-        pitch = 0;
+      if (this.hasMouse) {
+        var mouseHeading = null;
+        if (this.VR.hasOrientation) {
+          mouseHeading = this.mousePointer.root.rotation.y;
+          var newMouseHeading = WEDGE * Math.floor(mouseHeading / WEDGE + 0.5);
+          if (newMouseHeading !== 0) {
+            this.Mouse.commands.U.offset -= this.Mouse.getValue("U") - 1;
+          }
+          mouseHeading = newMouseHeading + this.Mouse.commands.U.offset * 2;
+          pitch = 0;
+        } else {
+          mouseHeading = this.Mouse.getValue("heading");
+        }
+        heading += mouseHeading;
       }
-
-      heading += mouseHeading;
 
       // move stage according to heading and thrust
       EULER_TEMP.set(pitch, heading, 0, "YXZ");
@@ -61721,6 +61245,12 @@ var FPSInput = function (_Primrose$AbstractEve) {
       QUAT_TEMP.setFromEuler(EULER_TEMP);
 
       this.moveStage(DISPLACEMENT.copy(this.velocity).multiplyScalar(dt).applyQuaternion(QUAT_TEMP).add(this.head.position));
+    }
+  }, {
+    key: "cancelVR",
+    value: function cancelVR() {
+      this.VR.cancel();
+      this.Mouse.commands.U.offset = 0;
     }
   }, {
     key: "moveStage",
@@ -62354,12 +61884,12 @@ var Mouse = function (_Primrose$InputProces) {
       }
     };
 
-    window.addEventListener("mousedown", setState.bind(_this, true), false);
-    window.addEventListener("mouseup", setState.bind(_this, false), false);
-    window.addEventListener("contextmenu", function (event) {
+    DOMElement.addEventListener("mousedown", setState.bind(_this, true), false);
+    DOMElement.addEventListener("mouseup", setState.bind(_this, false), false);
+    DOMElement.addEventListener("contextmenu", function (event) {
       return !(event.ctrlKey && event.shiftKey) && event.preventDefault();
     }, false);
-    window.addEventListener("mousemove", function (event) {
+    DOMElement.addEventListener("mousemove", function (event) {
       setState(true, event);
 
       if (PointerLock.isActive) {
@@ -62378,7 +61908,7 @@ var Mouse = function (_Primrose$InputProces) {
       }
     }, false);
 
-    window.addEventListener("wheel", function (event) {
+    DOMElement.addEventListener("wheel", function (event) {
       if (isChrome) {
         _this.W += event.deltaX;
         _this.Z += event.deltaY;
@@ -62709,9 +62239,9 @@ var Touch = function (_Primrose$InputProces) {
       }
     };
 
-    window.addEventListener("touchstart", setState.bind(_this, true, false), false);
-    window.addEventListener("touchend", setState.bind(_this, false, true), false);
-    window.addEventListener("touchmove", setState.bind(_this, true, true), false);
+    DOMElement.addEventListener("touchstart", setState.bind(_this, true, false), false);
+    DOMElement.addEventListener("touchend", setState.bind(_this, false, true), false);
+    DOMElement.addEventListener("touchmove", setState.bind(_this, true, true), false);
     return _this;
   }
 
@@ -62798,7 +62328,7 @@ var VR = function (_Primrose$PoseInputPr) {
     WebVRStandardMonitor();
     _this.ready = navigator.getVRDisplays().then(function (displays) {
       // We skip the Standard Monitor and Magic Window on iOS because we can't
-      // go fullscreen on those systems.
+      // go full screen on those systems.
       _this.displays.push.apply(_this.displays, displays.filter(function (display) {
         return !isiOS || VR.isStereoDisplay(display);
       }));
@@ -63556,45 +63086,53 @@ var Audio3D = function () {
 
     this.ready = new Promise(function (resolve, reject) {
       try {
-        (function () {
-          var finishSetup = function finishSetup() {
-            _this.sampleRate = _this.context.sampleRate;
-            _this.mainVolume = _this.context.createGain();
-            _this.start();
-            resolve();
-          };
+        if (Audio3D.isAvailable) {
+          (function () {
+            var finishSetup = function finishSetup() {
+              try {
+                _this.sampleRate = _this.context.sampleRate;
+                _this.mainVolume = _this.context.createGain();
+                _this.start();
+                resolve();
+              } catch (exp) {
+                reject(exp);
+              }
+            };
 
-          if (!isiOS) {
-            _this.context = new AudioContext();
-            finishSetup();
-          } else {
-            (function () {
-              var unlock = function unlock() {
-                _this.context = _this.context || new AudioContext();
-                var source = _this.context.createBufferSource();
-                source.buffer = _this.createRawSound([[0]]);
-                source.connect(_this.context.destination);
-                source.noteOn(0);
-                setTimeout(function () {
-                  if (source.playbackState === source.PLAYING_STATE || source.playbackState === source.FINISHED_STATE) {
-                    window.removeEventListener("mouseup", unlock);
-                    window.removeEventListener("touchend", unlock);
-                    window.removeEventListener("keyup", unlock);
-                    try {
-                      finishSetup();
-                    } catch (exp) {
-                      reject(exp);
-                    }
+            if (!isiOS) {
+              _this.context = new AudioContext();
+              finishSetup();
+            } else {
+              (function () {
+                var unlock = function unlock() {
+                  try {
+                    (function () {
+                      _this.context = _this.context || new AudioContext();
+                      var source = _this.context.createBufferSource();
+                      source.buffer = _this.createRawSound([[0]]);
+                      source.connect(_this.context.destination);
+                      source.noteOn(0);
+                      setTimeout(function () {
+                        if (source.playbackState === source.PLAYING_STATE || source.playbackState === source.FINISHED_STATE) {
+                          window.removeEventListener("mouseup", unlock);
+                          window.removeEventListener("touchend", unlock);
+                          window.removeEventListener("keyup", unlock);
+                          finishSetup();
+                        }
+                      }, 0);
+                    })();
+                  } catch (exp) {
+                    reject(exp);
                   }
-                }, 0);
-              };
+                };
 
-              window.addEventListener("mouseup", unlock, false);
-              window.addEventListener("touchend", unlock, false);
-              window.addEventListener("keyup", unlock, false);
-            })();
-          }
-        })();
+                window.addEventListener("mouseup", unlock, false);
+                window.addEventListener("touchend", unlock, false);
+                window.addEventListener("keyup", unlock, false);
+              })();
+            }
+          })();
+        }
       } catch (exp) {
         reject(exp);
       }
@@ -63613,7 +63151,7 @@ var Audio3D = function () {
   }, {
     key: "setPlayer",
     value: function setPlayer(obj) {
-      if (this.context) {
+      if (this.context && this.context.listener) {
         obj.updateMatrixWorld();
         TEMP.copy(obj.matrixWorld);
         var mx = TEMP.elements[12],
@@ -63755,7 +63293,7 @@ var Audio3D = function () {
   return Audio3D;
 }();
 
-Audio3D.isAvailable = !!window.AudioContext && AudioContext.prototype.createGain;
+Audio3D.isAvailable = !!window.AudioContext && !!AudioContext.prototype.createGain;
 if(typeof window !== "undefined") window.Primrose.Output.Audio3D = Audio3D;
 })();
 // end D:\Documents\VR\Primrose\src\Primrose\Output\Audio3D.js
@@ -63772,14 +63310,18 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 Window.prototype.AudioContext = Window.prototype.AudioContext || Window.prototype.webkitAudioContext || function () {};
 
 var PIANO_BASE = Math.pow(2, 1 / 12),
-    MAX_NOTE_COUNT = (navigator.maxTouchPoints || 10) + 1;
-
-function piano(n) {
-  return 440 * Math.pow(PIANO_BASE, n - 49);
-}
+    MAX_NOTE_COUNT = (navigator.maxTouchPoints || 10) + 1,
+    TYPES = ["sine", "square", "sawtooth", "triangle"];
 
 var Music = function () {
-  function Music(audio, type, numNotes) {
+  _createClass(Music, null, [{
+    key: "piano",
+    value: function piano(n) {
+      return 440 * Math.pow(PIANO_BASE, n - 49);
+    }
+  }]);
+
+  function Music(audio, numNotes) {
     var _this = this;
 
     _classCallCheck(this, Music);
@@ -63787,7 +63329,8 @@ var Music = function () {
     if (numNotes === undefined) {
       numNotes = MAX_NOTE_COUNT;
     }
-    this._type = type || "sawtooth";
+
+    this.oscillators = {};
     this.isAvailable = false;
     this.audio = audio;
     this.audio.ready.then(function () {
@@ -63796,69 +63339,96 @@ var Music = function () {
       _this.mainVolume.connect(_this.audio.mainVolume);
       _this.mainVolume.gain.value = 1;
       _this.numNotes = numNotes;
-      _this.oscillators = [];
-
-      for (var i = 0; i < _this.numNotes; ++i) {
-        var g = ctx.createGain(),
-            o = ctx.createOscillator();
-        g.connect(_this.mainVolume);
-        g.gain.value = 0;
-        o.type = _this.type;
-        o.frequency.value = 0;
-        o.connect(g);
-        o.start();
-        _this.oscillators.push({
-          osc: o,
-          gn: g,
-          timeout: null
-        });
-      }
+      TYPES.forEach(function (type) {
+        var oscs = _this.oscillators[type] = [];
+        _this[type] = _this.play.bind(_this, type);
+        for (var i = 0; i < _this.numNotes; ++i) {
+          var g = ctx.createGain(),
+              o = ctx.createOscillator(),
+              p = ctx.createPanner();
+          g.connect(p);
+          p.connect(_this.mainVolume);
+          g.gain.value = 0;
+          o.type = type;
+          o.frequency.value = 0;
+          o.connect(g);
+          o.start();
+          oscs.push({
+            osc: o,
+            gn: g,
+            pnr: p,
+            timeout: null,
+            index: oscs.length
+          });
+        }
+      });
       _this.isAvailable = true;
     });
   }
 
   _createClass(Music, [{
     key: "noteOn",
-    value: function noteOn(volume, i, n) {
+    value: function noteOn(type, volume, i, x, y, z, dx, dy, dz, n) {
       if (this.isAvailable) {
-        if (n === undefined) {
-          n = 0;
+        x = x || 0;
+        y = y || 0;
+        z = z || 0;
+        if (dx === undefined || dx === null) {
+          dx = 0;
         }
-        var o = this.oscillators[n % this.numNotes],
-            f = piano(parseFloat(i) + 1);
+        dy = dy || 0;
+        dz = dz || 0;
+        var osc = this.oscillators[type];
+        if (n === undefined || n === null) {
+          for (n = 0; n < osc.length; ++n) {
+            if (!osc[n].timeout) {
+              break;
+            }
+          }
+        }
+
+        var o = osc[n % this.numNotes],
+            f = Music.piano(parseFloat(i) + 1);
         o.gn.gain.value = volume;
         o.osc.frequency.setValueAtTime(f, this.audio.context.currentTime);
+        o.pnr.setPosition(x, y, z);
+        o.pnr.setOrientation(dx, dy, dz);
         return o;
       }
     }
   }, {
     key: "noteOff",
-    value: function noteOff(n) {
+    value: function noteOff(type, n) {
       if (this.isAvailable) {
         if (n === undefined) {
           n = 0;
         }
-        var o = this.oscillators[n % this.numNotes];
+        var o = this.oscillators[type][n % this.numNotes];
         o.osc.frequency.setValueAtTime(0, this.audio.context.currentTime);
         o.gn.gain.value = 0;
       }
     }
   }, {
     key: "play",
-    value: function play(i, volume, duration, n) {
+    value: function play(type, i, volume, duration, x, y, z, dx, dy, dz, n) {
+      var _this2 = this;
+
       if (this.isAvailable) {
-        if (typeof n !== "number") {
-          n = 0;
-        }
-        var o = this.noteOn(volume, i, n);
-        if (o.timeout) {
-          clearTimeout(o.timeout);
-          o.timeout = null;
-        }
-        o.timeout = setTimeout(function (n, o) {
-          this.noteOff(n);
-          o.timeout = null;
-        }.bind(this, n, o), duration * 1000);
+        return new Promise(function (resolve, reject) {
+          var o = _this2.noteOn(type, volume, i, x, y, z, dx, dy, dz, n);
+          if (o.timeout) {
+            clearTimeout(o.timeout);
+            o.timeout = null;
+            resolve();
+          }
+          o.timeout = setTimeout(function (o) {
+            this.noteOff(type, o.index);
+            o.timeout = null;
+            resolve();
+          }.bind(_this2, o), duration * 1000);
+        });
+      } else {
+        return Promise.reject("No audio");
       }
     }
   }, {
@@ -63867,12 +63437,12 @@ var Music = function () {
       return this._type;
     },
     set: function set(v) {
-      var _this2 = this;
+      var _this3 = this;
 
       if (this.isAvailable) {
         this._type = v;
         this.oscillators.forEach(function (o) {
-          return o.osc.type = _this2._type;
+          return o.osc.type = _this3._type;
         });
       }
     }
@@ -63880,6 +63450,8 @@ var Music = function () {
 
   return Music;
 }();
+
+Music.TYPES = TYPES;
 if(typeof window !== "undefined") window.Primrose.Output.Music = Music;
 })();
 // end D:\Documents\VR\Primrose\src\Primrose\Output\Music.js
@@ -64037,6 +63609,17 @@ function steps(min, max, steps) {
 if(typeof window !== "undefined") window.Primrose.Random.steps = steps;
 })();
 // end D:\Documents\VR\Primrose\src\Primrose\Random\steps.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\Primrose\Random\vector.js
+(function(){"use strict";
+
+function vector(min, max) {
+  return new THREE.Vector3().set(Primrose.Random.number(min, max), Primrose.Random.number(min, max), Primrose.Random.number(min, max));
+}
+if(typeof window !== "undefined") window.Primrose.Random.vector = vector;
+})();
+// end D:\Documents\VR\Primrose\src\Primrose\Random\vector.js
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 // start D:\Documents\VR\Primrose\src\Primrose\Text\CodePage.js
@@ -68240,6 +67823,66 @@ if(typeof window !== "undefined") window.THREE.MTLLoader = MTLLoader;
 // end D:\Documents\VR\Primrose\src\THREE\MTLLoader.js
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\BufferGeometry\prototype\center.js
+(function(){"use strict";
+
+function center() {
+      this.computeBoundingBox();
+      var b = this.boundingBox,
+          dx = (b.max.x + b.min.x) / 2,
+          dy = (b.max.y + b.min.y) / 2,
+          dz = (b.max.z + b.min.z) / 2;
+      return this.offset(-dx, -dy, -dz);
+}
+if(typeof window !== "undefined") window.THREE.BufferGeometry.prototype.center = center;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\BufferGeometry\prototype\center.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\BufferGeometry\prototype\colored.js
+(function(){"use strict";
+
+function colored(name, color, options) {
+  var mesh = window.colored(this, color, options);
+  mesh.name = name;
+  return mesh;
+}
+if(typeof window !== "undefined") window.THREE.BufferGeometry.prototype.colored = colored;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\BufferGeometry\prototype\colored.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\BufferGeometry\prototype\offset.js
+(function(){"use strict";
+
+function offset(x, y, z) {
+  var arr = this.attributes.position.array,
+      l = this.attributes.position.itemSize;
+  for (var i = 0; i < arr.length; i += l) {
+    arr[i] += x;
+    arr[i + 1] += y;
+    arr[i + 2] += z;
+  }
+  return this;
+}
+if(typeof window !== "undefined") window.THREE.BufferGeometry.prototype.offset = offset;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\BufferGeometry\prototype\offset.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\BufferGeometry\prototype\textured.js
+(function(){"use strict";
+
+function textured(name, texture, options) {
+  var obj = window.textured(this, texture, options);
+  obj.name = name;
+  return obj;
+}
+if(typeof window !== "undefined") window.THREE.BufferGeometry.prototype.textured = textured;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\BufferGeometry\prototype\textured.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // start D:\Documents\VR\Primrose\src\THREE\CubeTextureLoader\prototype\load.js
 (function(){"use strict";
 
@@ -68309,6 +67952,66 @@ if(typeof window !== "undefined") window.THREE.Euler.prototype.toString = toStri
 // end D:\Documents\VR\Primrose\src\THREE\Euler\prototype\toString.js
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\Geometry\prototype\center.js
+(function(){"use strict";
+
+function center() {
+      this.computeBoundingBox();
+      var b = this.boundingBox,
+          dx = (b.max.x + b.min.x) / 2,
+          dy = (b.max.y + b.min.y) / 2,
+          dz = (b.max.z + b.min.z) / 2;
+      return this.offset(-dx, -dy, -dz);
+}
+if(typeof window !== "undefined") window.THREE.Geometry.prototype.center = center;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\Geometry\prototype\center.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\Geometry\prototype\colored.js
+(function(){"use strict";
+
+function colored(name, color, options) {
+  var mesh = window.colored(this, color, options);
+  mesh.name = name;
+  return mesh;
+}
+if(typeof window !== "undefined") window.THREE.Geometry.prototype.colored = colored;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\Geometry\prototype\colored.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\Geometry\prototype\offset.js
+(function(){"use strict";
+
+function offset(x, y, z) {
+  var arr = this.vertices;
+  for (var i = 0; i < arr.length; ++i) {
+    var vert = arr[i];
+    vert.x += x;
+    vert.y += y;
+    vert.z += z;
+  }
+  return this;
+}
+if(typeof window !== "undefined") window.THREE.Geometry.prototype.offset = offset;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\Geometry\prototype\offset.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\Geometry\prototype\textured.js
+(function(){"use strict";
+
+function textured(name, texture, options) {
+  var obj = window.textured(this, texture, options);
+  obj.name = name;
+  return obj;
+}
+if(typeof window !== "undefined") window.THREE.Geometry.prototype.textured = textured;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\Geometry\prototype\textured.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // start D:\Documents\VR\Primrose\src\THREE\Matrix4\prototype\debug.js
 (function(){"use strict";
 
@@ -68369,6 +68072,30 @@ if(typeof window !== "undefined") window.THREE.Matrix4.prototype.toString = toSt
 // end D:\Documents\VR\Primrose\src\THREE\Matrix4\prototype\toString.js
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\Mesh\prototype\colored.js
+(function(){"use strict";
+
+function colored(name, color, options) {
+  var mesh = window.colored(this, color, options);
+  mesh.name = name;
+  return mesh;
+}
+if(typeof window !== "undefined") window.THREE.Mesh.prototype.colored = colored;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\Mesh\prototype\colored.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\Mesh\prototype\textured.js
+(function(){"use strict";
+
+function textured(texture, options) {
+  return window.textured(this, texture, options);
+}
+if(typeof window !== "undefined") window.THREE.Mesh.prototype.textured = textured;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\Mesh\prototype\textured.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // start D:\Documents\VR\Primrose\src\THREE\Object3D\prototype\addToBrowserEnvironment.js
 (function(){"use strict";
 
@@ -68392,6 +68119,23 @@ function addToBrowserEnvironment(env, scene) {
 if(typeof window !== "undefined") window.THREE.Object3D.prototype.addToBrowserEnvironment = addToBrowserEnvironment;
 })();
 // end D:\Documents\VR\Primrose\src\THREE\Object3D\prototype\addToBrowserEnvironment.js
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// start D:\Documents\VR\Primrose\src\THREE\Object3D\prototype\latLon.js
+(function(){"use strict";
+
+function latLon(lat, lon, r) {
+  lat = -Math.PI * (lat || 0) / 180;
+  lon = Math.PI * (lon || 0) / 180;
+  r = r || 1.5;
+  this.rotation.set(lat, lon, 0, "XYZ");
+  this.position.set(0, 0, -r);
+  this.position.applyQuaternion(this.quaternion);
+  return this;
+}
+if(typeof window !== "undefined") window.THREE.Object3D.prototype.latLon = latLon;
+})();
+// end D:\Documents\VR\Primrose\src\THREE\Object3D\prototype\latLon.js
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 // start D:\Documents\VR\Primrose\src\THREE\Quaternion\prototype\debug.js
@@ -68545,27 +68289,363 @@ if(typeof window !== "undefined") window.THREE.Vector4.prototype.toString = toSt
 })();
 // end D:\Documents\VR\Primrose\src\THREE\Vector4\prototype\toString.js
 ////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-// start D:\Documents\VR\Plume\src\app.js
-(function(){"use strict";
+(function () {
+'use strict';
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
+  return typeof obj;
+} : function (obj) {
+  return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
+};
+
+
+
+
+
+var asyncGenerator = function () {
+  function AwaitValue(value) {
+    this.value = value;
+  }
+
+  function AsyncGenerator(gen) {
+    var front, back;
+
+    function send(key, arg) {
+      return new Promise(function (resolve, reject) {
+        var request = {
+          key: key,
+          arg: arg,
+          resolve: resolve,
+          reject: reject,
+          next: null
+        };
+
+        if (back) {
+          back = back.next = request;
+        } else {
+          front = back = request;
+          resume(key, arg);
+        }
+      });
+    }
+
+    function resume(key, arg) {
+      try {
+        var result = gen[key](arg);
+        var value = result.value;
+
+        if (value instanceof AwaitValue) {
+          Promise.resolve(value.value).then(function (arg) {
+            resume("next", arg);
+          }, function (arg) {
+            resume("throw", arg);
+          });
+        } else {
+          settle(result.done ? "return" : "normal", result.value);
+        }
+      } catch (err) {
+        settle("throw", err);
+      }
+    }
+
+    function settle(type, value) {
+      switch (type) {
+        case "return":
+          front.resolve({
+            value: value,
+            done: true
+          });
+          break;
+
+        case "throw":
+          front.reject(value);
+          break;
+
+        default:
+          front.resolve({
+            value: value,
+            done: false
+          });
+          break;
+      }
+
+      front = front.next;
+
+      if (front) {
+        resume(front.key, front.arg);
+      } else {
+        back = null;
+      }
+    }
+
+    this._invoke = send;
+
+    if (typeof gen.return !== "function") {
+      this.return = undefined;
+    }
+  }
+
+  if (typeof Symbol === "function" && Symbol.asyncIterator) {
+    AsyncGenerator.prototype[Symbol.asyncIterator] = function () {
+      return this;
+    };
+  }
+
+  AsyncGenerator.prototype.next = function (arg) {
+    return this._invoke("next", arg);
+  };
+
+  AsyncGenerator.prototype.throw = function (arg) {
+    return this._invoke("throw", arg);
+  };
+
+  AsyncGenerator.prototype.return = function (arg) {
+    return this._invoke("return", arg);
+  };
+
+  return {
+    wrap: function (fn) {
+      return function () {
+        return new AsyncGenerator(fn.apply(this, arguments));
+      };
+    },
+    await: function (value) {
+      return new AwaitValue(value);
+    }
+  };
+}();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var get = function get(object, property, receiver) {
+  if (object === null) object = Function.prototype;
+  var desc = Object.getOwnPropertyDescriptor(object, property);
+
+  if (desc === undefined) {
+    var parent = Object.getPrototypeOf(object);
+
+    if (parent === null) {
+      return undefined;
+    } else {
+      return get(parent, property, receiver);
+    }
+  } else if ("value" in desc) {
+    return desc.value;
+  } else {
+    var getter = desc.get;
+
+    if (getter === undefined) {
+      return undefined;
+    }
+
+    return getter.call(receiver);
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var set = function set(object, property, value, receiver) {
+  var desc = Object.getOwnPropertyDescriptor(object, property);
+
+  if (desc === undefined) {
+    var parent = Object.getPrototypeOf(object);
+
+    if (parent !== null) {
+      set(parent, property, value, receiver);
+    }
+  } else if ("value" in desc && desc.writable) {
+    desc.value = value;
+  } else {
+    var setter = desc.set;
+
+    if (setter !== undefined) {
+      setter.call(receiver, value);
+    }
+  }
+
+  return value;
+};
+
+var send = null;
+
+function mangle(name) {
+  return "_" + name;
+}
+
+function wrap(name) {
+  var orig = name;
+  while (console[orig]) {
+    orig = mangle(orig);
+  }
+  console[orig] = console[name];
+  return function () {
+    var args = [];
+    for (var i = 0; i < arguments.length; ++i) {
+      var elem = arguments[i];
+      if ((typeof elem === "undefined" ? "undefined" : _typeof(elem)) === "object" && !(elem instanceof String)) {
+        var obj1 = elem,
+            obj2 = {};
+        for (var key in obj1) {
+          obj2[key] = obj1[key];
+          if (obj2[key] !== null && obj2[key] !== undefined) {
+            obj2[key] = obj2[key].toString();
+          }
+        }
+        args.push(obj2);
+      } else if (elem) {
+        args.push(elem.toString());
+      } else {
+        args.push("null");
+      }
+    }
+    var obj = send({
+      name: name,
+      args: args
+    });
+    if (obj) {
+      console[orig].apply(console, arguments);
+    }
+  };
+}
+
+function onError(message, source, lineno, colno, error) {
+  colno = colno || window.event && window.event.errorCharacter;
+  var done = false,
+      name = "error",
+      stack = error && error.stack;
+
+  if (!stack) {
+    if (arguments.callee) {
+      var head = arguments.callee.caller;
+      while (head) {
+        stack.push(head.name);
+        head = head.caller;
+      }
+    } else {
+      stack = "N/A";
+    }
+  }
+
+  var data = {
+    type: "error",
+    time: new Date().toLocaleTimeString(),
+    message: message,
+    source: source,
+    lineno: lineno,
+    colno: colno,
+    error: error.message,
+    stack: stack
+  };
+
+  while (!done && console[name]) {
+    try {
+      console[name](data);
+      done = true;
+    } catch (exp) {
+      name = mangle(name);
+    }
+  }
+}
+
+function setup(type, target, redirects) {
+  if (type !== logger.DISABLED) {
+    if ((type === logger.HTTP || type === logger.WEBSOCKET) && location.protocol === "file:") {
+      console.warn("Can't perform HTTP requests from the file system. Not going to setup the error proxy, but will setup the error catch-all.");
+    } else if (type === logger.HTTP) {
+      send = function send(data) {
+        var req = new XMLHttpRequest();
+        req.open("POST", target);
+        req.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+        req.send(JSON.stringify(data));
+        return data;
+      };
+    } else if (type === logger.WEBSOCKET) {
+      var socket = new WebSocket(target);
+      send = function send(data) {
+        socket.send(JSON.stringify(data));
+        return data;
+      };
+    } else if (type === logger.DOM) {
+      var output = document.querySelector(target);
+      send = function send(data) {
+        var elem = document.createElement("pre");
+        elem.appendChild(document.createTextNode(JSON.stringify(data)));
+        output.appendChild(elem);
+        return data;
+      };
+    } else if (type === logger.USER) {
+      if (!(target instanceof Function)) {
+        console.warn("The target parameter was expected to be a function, but it was", target);
+      } else {
+        send = target;
+      }
+    }
+
+    if (send !== null) {
+      redirects = redirects || ["log", "info", "error"];
+      redirects.forEach(function (n) {
+        console[n] = wrap(n);
+      });
+    }
+
+    window.addEventListener("error", function (evt) {
+      onError(evt.message, evt.filename, evt.lineno, evt.colno, evt.error);
+    }, false);
+  }
+}
+
+logger = {
+  setup: setup,
+  DISABLED: 0,
+  HTTP: 1,
+  WEBSOCKET: 2,
+  DOM: 3,
+  USER: 4
+};
 
 WebVRStandardMonitor();
 
 prog.bar.style.height = "10px";
 
-var ctrls = Primrose.DOM.findEverything(),
-    loginControls = [ctrls.userName, ctrls.connect],
-    names = NameGen.compile("!mi"),
-    protocol = location.protocol.replace("http", "ws"),
-    serverPath = protocol + "//" + location.hostname,
-    roomPattern = /\broom=(\w+)/,
-    userPattern = /\buser=(\w+)/,
-    defaultRoomName = null,
-    defaultUserName = null,
-    socket = null,
-    session = null,
-    publisher = null,
-    app = new Primrose.BrowserEnvironment({
+var ctrls = Primrose.DOM.findEverything();
+var loginControls = [ctrls.userName, ctrls.connect];
+var names = NameGen.compile("!mi");
+var protocol = location.protocol.replace("http", "ws");
+var serverPath = protocol + "//" + location.hostname;
+var roomPattern = /\broom=(\w+)/;
+var userPattern = /\buser=(\w+)/;
+var defaultRoomName = null;
+var defaultUserName = null;
+var socket = null;
+var session = null;
+var publisher = null;
+var app = new Primrose.BrowserEnvironment({
   useFog: false,
   useGaze: true,
   quality: Quality.HIGH,
@@ -68762,7 +68842,6 @@ function authSucceeded() {
     });
   });
 }
-if(typeof window !== "undefined") window.app = app;
-})();
-// end D:\Documents\VR\Plume\src\app.js
-////////////////////////////////////////////////////////////////////////////////
+
+}());
+//# sourceMappingURL=plumeLib.js.map

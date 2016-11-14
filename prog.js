@@ -1,4 +1,4 @@
-var pre = (function () {
+var prog = (function () {
 'use strict';
 
 if (!window.DEBUG) {
@@ -81,4 +81,4 @@ if (curScript && curScript.dataset.app) {
 return index;
 
 }());
-//# sourceMappingURL=pre.js.map
+//# sourceMappingURL=prog.js.map

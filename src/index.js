@@ -1,3 +1,5 @@
+import logger from "../../bare-bones-logger/src";
+
 WebVRStandardMonitor();
 
 prog.bar.style.height = "10px";
