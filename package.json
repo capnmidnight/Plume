@@ -1,7 +1,7 @@
 {
   "name": "plume",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "title": "Plume VR",
   "description": "Instant VR meetings in your browser.",
   "themeColor": "purple",
@@ -33,7 +33,7 @@
   "dependencies": {
     "azure-storage": "^2.1.0",
     "jshashes": "^1.0.6",
-    "marigold-build": "^1.6.2",
+    "marigold-build": "capnmidnight/marigold",
     "opentok": "^2.5.0",
     "primrose": "^0.31.6",
     "socket.io-client": "^2.0.1"
