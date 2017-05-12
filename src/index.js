@@ -1,4 +1,4 @@
-import Primrose from "primrose/Primrose.modules.min.js";
+import Primrose from "primrose/Primrose.modules.js";
 import loginForm from "./login-form";
 
 let socket = null,
@@ -27,19 +27,19 @@ const protocol = location.protocol.replace("http", "ws"),
       socket = null;
       env.disconnect();
     },
-    onauthentication(roomName, userName) {
+    onauthenticate(roomName, userName) {
       if (!socket) {
-        console.log("connecting to: %s", options.serverPath);
-        socket = io(options.serverPath);
+        console.log("connecting to: %s", serverPath);
+        socket = io(serverPath);
         form.setupSocket(socket);
       }
 
       socket.emit("guest", {
         userName,
-        appKey
+        appKey: roomName
       });
     },
-    onautheticated: function(roomName, userName) {
+    onauthenticated: function(roomName, userName) {
       env.connect(socket, userName);
       Primrose.HTTP.getObject(`/tokbox/${encodeURI(roomName)}/${encodeURI(userName)}`).then((cred) => {
         session = OT.initSession(cred.apiKey, cred.sessionId);

@@ -1,4 +1,4 @@
-import Primrose from "primrose/Primrose.modules.min.js";
+import Primrose from "primrose/Primrose.modules.js";
 
 export default function loginForm(options) {
 
