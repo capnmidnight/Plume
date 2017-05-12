@@ -1,11 +1,11 @@
 const OpenTok = require("opentok"),
-  API_KEY = process.env.OPENTOK_KEY || require("../data/secrets.json").openTokKey;
+  secrets = require("./data/secrets.json"),
+  API_KEY = process.env.OPENTOK_KEY || secrets.openTokKey,
+  SECRET = process.env.OPENTOK_SECRET || secrets.openTokSecret;
 
 if(API_KEY){
-  const opentok = new OpenTok(
-      API_KEY,
-      process.env.OPENTOK_SECRET || require("../data/secrets.json").openTokSecret),
-    Message = require("notion-node/src/Message");
+  const opentok = new OpenTok(API_KEY, SECRET),
+    sessions = {};
 
   function getSessionID() {
     return new Promise((resolve, reject) => {
@@ -19,27 +19,24 @@ if(API_KEY){
     });
   }
 
-  const sessions = {};
-
-  module.exports = {
-    URLPattern: /^\/tokbox\/?\?room=([a-zA-Z0-9_%]+)&user=([a-zA-Z0-9_%]+)$/,
-    GET: {
-      "*/*": (room, user, state) => {
+  module.exports = function(appServer) {
+    appServer.get(
+      "/tokbox/:room/:user",
+      (req, res) => {
+        let { room, user } = req.params;
         room = decodeURI(room).toLocaleUpperCase();
         user = decodeURI(user).toLocaleUpperCase();
         if(!sessions[room]){
           sessions[room] = getSessionID();
         }
-        return sessions[room].then((session) => {
-          return {
+        sessions[room].then((session) =>
+          res.json({
             apiKey: API_KEY,
             sessionId: session.sessionId,
             token: session.generateToken({
               data: user
             })
-          };
-        }).then(Message.json);
-      }
-    }
+          }));
+      });
   };
 }

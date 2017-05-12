@@ -22,11 +22,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node server.js --mode=dev --path=.. --url=Plume/",
-    "legend": "node server.js --mode=dev --path=.. --url=Legend3D/",
-    "photo": "node server.js --mode=dev --path=.. --url=photoVR/",
-    "jwd": "node server.js --mode=dev --path=.. --url=JWD/",
-    "primrose": "node server.js --mode=dev --path=.. --url=Primrose/"
+    "dev": "gulp"
   },
   "repository": {
     "type": "git",
@@ -35,14 +31,11 @@
   "author": "Sean T. McBeth <sean@notiontheory.com> (https://www.notiontheory.com)",
   "license": "GPL-3.0",
   "dependencies": {
-    "azure-storage": "^0.10.0",
-    "notion-node": "0.0.1",
-    "opentok": "^2.4.0"
-  },
-  "devDependencies": {
-    "jshashes": "^1.0.5",
-    "notiontheory-basic-build": "^2.6.0",
-    "primrose": "^0.28.0",
-    "socket.io-client": "^1.4.8"
+    "azure-storage": "^2.1.0",
+    "jshashes": "^1.0.6",
+    "marigold-build": "^1.6.2",
+    "opentok": "^2.5.0",
+    "primrose": "^0.31.6",
+    "socket.io-client": "^2.0.1"
   }
 }
