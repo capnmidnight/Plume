@@ -20,6 +20,10 @@
     webSocketServer: require("./server/webSocketServer")({
       mode: "dev"
     }),
+    mode: "dev",
+    key: "../primrosevr_com.key",
+    cert: "../primrosevr_com.crt",
+    certAuthority: "../CACert.crt",
     express: require("./server/routes")
   });
 
