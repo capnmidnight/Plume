@@ -33,7 +33,7 @@
   "dependencies": {
     "azure-storage": "^2.1.0",
     "jshashes": "^1.0.6",
-    "marigold-build": "git://github.com/capnmidnight/marigold.git",
+    "marigold-build": "^1.7.1",
     "opentok": "^2.5.0",
     "primrose": "^0.31.6",
     "socket.io-client": "^2.0.1"
