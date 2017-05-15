@@ -47,4 +47,7 @@ html
     #iOSMessage.errorMessage(style="display:none")
       p We regret to inform you that Apple iPhones and iPads do not support the necessary features to allow PlumeVR to work in your browser. The current status from Apple is that these features are #[a(href="https://webkit.org/status/#specification-webrtc", target="_blank") in development], but there has been no estimate provided on when it will be ready.
       p We're very sorry. This is out of our hands. Blame Apple for not following web standards.
-    script(src= fileRoot + "node_modules/primrose/preloader" + jsExt, data-files="//static.opentok.com/v2/js/opentok.min.js," + fileRoot + "lib/namegen.js," + fileRoot + pkg.name + jsExt)
+    if debug
+      script(src= fileRoot + "node_modules/primrose/preloader" + jsExt, data-files="//static.opentok.com/v2/js/opentok.min.js," + fileRoot + "lib/namegen.js," + fileRoot + pkg.name + jsExt)
+    else
+      script(src= fileRoot + "node_modules/primrose/preloader" + jsExt, data-files=fileRoot + "node_modules/socket.io-client/dist/socket.io.js,//static.opentok.com/v2/js/opentok.min.js," + fileRoot + "lib/namegen.js," + fileRoot + pkg.name + jsExt)
