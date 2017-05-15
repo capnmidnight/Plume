@@ -21,7 +21,7 @@
   "GoogleWebVROriginTrialToken": "<check back later>",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node app.js",
     "dev": "gulp"
   },
   "repository": {
