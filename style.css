@@ -129,11 +129,17 @@ button:disabled {
   border-bottom-right-radius: 0;
   font-size: 1.5em;
 }
-#errorMessage {
+.errorMessage {
   color: #f330d8;
   border: dashed 3px #f330d8;
   padding: 1em;
   margin-top: 1em;
+}
+#iOSMessage {
+  position: absolute;
+  margin: 5em;
+  background-color: #fff;
+  font-size: 14pt;
 }
 #connect {
   display: inline-block;
