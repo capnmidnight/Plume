@@ -1,3 +1,4 @@
+var tokbox = require("./tokbox");
 module.exports = function(appServer) {
-  require("./tokbox")(appServer);
+  tokbox(appServer);
 };

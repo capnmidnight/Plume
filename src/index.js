@@ -83,3 +83,13 @@ const protocol = location.protocol.replace("http", "ws"),
       });
     }
   });
+
+
+env.addEventListener("ready", function() {
+  form.showLoginForm();
+
+  // window.addEventListener("vrdisplaypresentchange", () => {
+  //   const currDev = options.env.VR.currentDevice;
+  //   ctrls.controls.style.display = currDev && currDev.isPresenting ? "none" : "";
+  // });
+});

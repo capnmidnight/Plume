@@ -98,15 +98,6 @@ export default function loginForm(options) {
     options.onauthenticated(roomName, userName);
   }
 
-  function environmentReady() {
-    ctrls.loginForm.style.display = "";
-
-    window.addEventListener("vrdisplaypresentchange", () => {
-      const currDev = options.env.VR.currentDevice;
-      ctrls.controls.style.display = currDev && currDev.isPresenting ? "none" : "";
-    });
-  }
-
   function connectionError(evt){
     options.onconnectionerror(evt);
     authFailed("an error occured while connecting to the server.");
@@ -132,8 +123,6 @@ export default function loginForm(options) {
   ctrls.roomName.addEventListener("change", setRoomName, false);
   ctrls.userName.addEventListener("change", setUserName, false);
 
-  options.env.addEventListener("ready", environmentReady);
-
   window.addEventListener("popstate", setRoomName);
 
   setRoomName({ state: {
@@ -151,8 +140,10 @@ export default function loginForm(options) {
       socket.on("loginFailed", authFailed);
       socket.on("loginComplete", authSucceeded);
       socket.on("errorDetail", console.error.bind(console));
-    }
-  })
+    },
+
+    showLoginForm
+  });
 
   return ctrls;
 };

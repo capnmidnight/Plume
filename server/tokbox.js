@@ -3,7 +3,10 @@ const OpenTok = require("opentok"),
   API_KEY = process.env.OPENTOK_KEY || secrets.openTokKey,
   SECRET = process.env.OPENTOK_SECRET || secrets.openTokSecret;
 
-if(API_KEY){
+if(!API_KEY) {
+  module.exports = function(){};
+}
+else {
   const opentok = new OpenTok(API_KEY, SECRET),
     sessions = {};
 
