@@ -3,26 +3,31 @@ import loginForm from "./login-form";
 
 let socket = null,
   session = null,
-  publisher = null;
+  publisher = null,
+  env = null;
 
 const protocol = location.protocol.replace("http", "ws"),
   serverPath = protocol + "//" + location.host,
-  env = new Primrose.BrowserEnvironment({
-    useFog: false,
-    useGaze: true,
-    quality: Primrose.Constants.Quality.HIGH,
-    groundModel: "models/meeting/meetingroom.obj",
-    backgroundColor: 0x000000,
-    avatarModel: "models/avatar.json",
-    font: "fonts/helvetiker_regular.typeface.json",
-    progress: Preloader,
-    fullScreenButtonContainer: "#fullScreenButtonContainer"
-  }),
 
   form = loginForm({
-    serverPath,
-    env,
-    onconnectionerror(evt) {
+    onnotios() {
+      env = new Primrose.BrowserEnvironment({
+        useFog: false,
+        groundModel: "models/meeting/meetingroom.obj",
+        avatarModel: "models/avatar.json",
+        font: "fonts/helvetiker_regular.typeface.json",
+        progress: Preloader,
+        fullScreenButtonContainer: "#fullScreenButtonContainer"
+      });
+
+      env.addEventListener("ready", function() {
+        form.showLoginForm();
+        Array.prototype.forEach.call(document.querySelectorAll("#fullScreenButtonContainer > button"), function(btn) {
+          btn.className = "primary";
+        });
+      });
+    },
+    onconnectionerror() {
       socket.close();
       socket = null;
       env.disconnect();
@@ -83,13 +88,3 @@ const protocol = location.protocol.replace("http", "ws"),
       });
     }
   });
-
-
-env.addEventListener("ready", function() {
-  form.showLoginForm();
-
-  // window.addEventListener("vrdisplaypresentchange", () => {
-  //   const currDev = options.env.VR.currentDevice;
-  //   ctrls.controls.style.display = currDev && currDev.isPresenting ? "none" : "";
-  // });
-});

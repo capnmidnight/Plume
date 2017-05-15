@@ -59,9 +59,9 @@ export default function loginForm(options) {
     ctrls.userName.focus();
   }
 
-  function errorMessage(message) {
-    ctrls.errorMessage.innerHTML = message;
-    ctrls.errorMessage.style.display = "block";
+  function loginError(message) {
+    ctrls.loginError.innerHTML = message;
+    ctrls.loginError.style.display = "block";
     showLoginForm();
     disableLogin(false);
   }
@@ -81,12 +81,12 @@ export default function loginForm(options) {
   }
 
   function authFailed(reason) {
-    errorMessage("We couldn't log you in right now because " + reason.replace(/\[USER\]/g, ctrls.userName.value));
+    loginError("We couldn't log you in right now because " + reason.replace(/\[USER\]/g, ctrls.userName.value));
   }
 
   function authSucceeded() {
-    ctrls.errorMessage.innerHTML = "";
-    ctrls.errorMessage.style.display = "none";
+    ctrls.loginError.innerHTML = "";
+    ctrls.loginError.style.display = "none";
     disableLogin(false);
     hideLoginForm();
     const userName = getUserName(),
@@ -115,35 +115,44 @@ export default function loginForm(options) {
   let defaultRoomName = null,
     defaultUserName = null;
 
-  ctrls.closeButton.addEventListener("click", hideLoginForm, false);
-  ctrls.userName.addEventListener("keyup", authenticate, false);
-  ctrls.connect.addEventListener("click", authenticate, false);
-  ctrls.randomRoomName.addEventListener("click", setRoomName, false);
-  ctrls.randomUserName.addEventListener("click", setUserName, false);
-  ctrls.roomName.addEventListener("change", setRoomName, false);
-  ctrls.userName.addEventListener("change", setUserName, false);
+  if(isiOS) {
+    ctrls.iOSMessage.style.display = "";
+  }
+  else {
+    options.onnotios();
 
-  window.addEventListener("popstate", setRoomName);
+    ctrls.closeButton.addEventListener("click", hideLoginForm, false);
+    ctrls.userName.addEventListener("keyup", authenticate, false);
+    ctrls.connect.addEventListener("click", authenticate, false);
+    ctrls.randomRoomName.addEventListener("click", setRoomName, false);
+    ctrls.randomUserName.addEventListener("click", setUserName, false);
+    ctrls.roomName.addEventListener("change", setRoomName, false);
+    ctrls.userName.addEventListener("change", setUserName, false);
 
-  setRoomName({ state: {
-    roomName: fromField(location.search, roomPattern) || fromField(document.cookie, roomPattern)
-  }});
+    window.addEventListener("popstate", setRoomName);
 
-  setUserName({ state: {
-    userName: fromField(location.search, userPattern) || fromField(document.cookie, userPattern)
-  }});
+    const queryString = location.search;
 
-  Object.assign(ctrls, {
-    setupSocket(socket) {
-      socket.on("connect_error", connectionError);
-      socket.on("reconnect", authenticate);
-      socket.on("loginFailed", authFailed);
-      socket.on("loginComplete", authSucceeded);
-      socket.on("errorDetail", console.error.bind(console));
-    },
+    setRoomName({ state: {
+      roomName: fromField(queryString, roomPattern) || fromField(document.cookie, roomPattern)
+    }});
 
-    showLoginForm
-  });
+    setUserName({ state: {
+      userName: fromField(queryString, userPattern) || fromField(document.cookie, userPattern)
+    }});
+
+    Object.assign(ctrls, {
+      setupSocket(socket) {
+        socket.on("connect_error", connectionError);
+        socket.on("reconnect", authenticate);
+        socket.on("loginFailed", authFailed);
+        socket.on("loginComplete", authSucceeded);
+        socket.on("errorDetail", console.error.bind(console));
+      },
+
+      showLoginForm
+    });
+  }
 
   return ctrls;
 };
