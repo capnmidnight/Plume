@@ -18,12 +18,9 @@
     "*.html",
     "*.css"
   ], {
-    webSocketServer: require("./server/webSocketServer")({
-      mode: "dev"
-    }),
-    mode: "dev",
     path: ".",
-    url: "index.html",
+    port: 80,
+    mode: null,
     // instances: 2,
     // instance: function(i) {
     //   return "?room=NotionTheory&user=" + testNames[i];
@@ -31,8 +28,13 @@
     key: "../primrosevr_com.key",
     cert: "../primrosevr_com.crt",
     certAuthority: "../CACert.crt",
+    webSocketServer: require("./server/webSocketServer")({
+      mode: null
+    }),
     express: require("./server/routes")
   });
+
+gulp.task("devServer", devServer);
 
 marigold.taskify([js, html, css],{
   default: devServer
