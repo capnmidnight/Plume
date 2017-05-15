@@ -1,7 +1,9 @@
 const OpenTok = require("opentok"),
-  secrets = require("./data/secrets.json"),
-  API_KEY = process.env.OPENTOK_KEY || secrets.openTokKey,
-  SECRET = process.env.OPENTOK_SECRET || secrets.openTokSecret;
+  maybeGetFile = require("marigold-build/src/maybeGetFile"),
+  secretsFile = maybeGetFile("./data/secrets.json"),
+  secrets = secretsFile && JSON.parse(secretsFile),
+  API_KEY = process.env.OPENTOK_KEY || secrets && secrets.openTokKey,
+  SECRET = process.env.OPENTOK_SECRET || secrets && secrets.openTokSecret;
 
 if(!API_KEY) {
   module.exports = function(){};

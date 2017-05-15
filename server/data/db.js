@@ -3,10 +3,18 @@
 const azure = require("azure-storage"),
   options = require("marigold-build/src/options").parse(process.argv),
   isDev = options.mode === "dev" || process.env.NODE_ENV === "dev",
-  connectionString = isDev && require("./secrets.json").connectionString || null,
+  maybeGetFile = require("marigold-build/src/maybeGetFile"),
+  secretsFile = maybeGetFile("./secrets.json"),
+  secrets = secretsFile && JSON.parse(secretsFile),
+  connectionString = isDev && secrets && secrets.connectionString || null,
   tables = azure.createTableService(connectionString),
   ent = azure.TableUtilities.entityGenerator,
   meta = {};
+
+console.log(secretsFile);
+if(!secretsFile) {
+  console.log("Couldn't read Secrets file.");
+}
 
 function wrap(table, obj) {
   var map = meta[table],
