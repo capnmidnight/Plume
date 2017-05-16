@@ -13,6 +13,7 @@ const protocol = location.protocol.replace("http", "ws"),
     onnotios() {
       env = new Primrose.BrowserEnvironment({
         useFog: false,
+        disableAutoPause: true,
         groundModel: "models/meeting/meetingroom.obj",
         avatarModel: "models/avatar.json",
         font: "fonts/helvetiker_regular.typeface.json",
