@@ -19,18 +19,20 @@
     "*.html",
     "*.css"
   ], {
-    path: ".",
-    port: 80,
-    mode: null,
-    // instances: 2,
-    // instance: function(i) {
-    //   return "?room=NotionTheory&user=" + testNames[i];
-    // },
+    instances: 2,
+    instance: function(i) {
+      return {
+        query: {
+          room: "NotionTheory",
+          user: testNames[i]
+        }
+      };
+    },
     key: "../primrosevr_com.key",
     cert: "../primrosevr_com.crt",
     certAuthority: "../CACert.crt",
     webSocketServer: require("./server/webSocketServer")({
-      mode: null
+      mode: "dev"
     }),
     express: require("./server/routes")
   });
