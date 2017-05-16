@@ -1,4 +1,5 @@
 import Primrose from "primrose/Primrose.modules.js";
+import NameGen from "../lib/namegen";
 
 export default function loginForm(options) {
 
