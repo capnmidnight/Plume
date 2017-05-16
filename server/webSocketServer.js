@@ -82,7 +82,6 @@ function setUser(socket, identity, key, user){
 }
 
 module.exports = function(options) {
-  console.log(options);
   const isDev = options && options.mode === "dev" || process.env.NODE_ENV === "dev";
 
   function guestLogin(socket) {
