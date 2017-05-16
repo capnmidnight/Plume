@@ -3,7 +3,8 @@
   marigold = require("marigold-build").setup(gulp, pkg),
   js = marigold.js({
     dependencies: ["format"],
-    format: "umd"
+    format: "umd",
+    moduleName: "env"
   }),
   html = marigold.html(["*.pug"]),
   css = marigold.css(["*.styl"]),
