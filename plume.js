@@ -58835,30 +58835,94 @@ function loginForm(options) {
   return ctrls;
 }
 
+var asyncToGenerator = function (fn) {
+  return function () {
+    var gen = fn.apply(this, arguments);
+    return new Promise(function (resolve, reject) {
+      function step(key, arg) {
+        try {
+          var info = gen[key](arg);
+          var value = info.value;
+        } catch (error) {
+          reject(error);
+          return;
+        }
+
+        if (info.done) {
+          resolve(value);
+        } else {
+          return Promise.resolve(value).then(function (value) {
+            step("next", value);
+          }, function (err) {
+            step("throw", err);
+          });
+        }
+      }
+
+      return step("next");
+    });
+  };
+};
+
 var socket = null;
 var session = null;
 var env = null;
+var monitor = null;
 
 var protocol = location.protocol.replace("http", "ws");
 var serverPath = protocol + "//" + location.host;
+var MF = index$5.Graphics.ModelFactory;
 var form = loginForm({
   onnotios: function onnotios() {
-    env = new index$5.BrowserEnvironment({
-      useFog: false,
-      disableAutoPause: true,
-      groundModel: "models/meeting/meetingroom.obj",
-      avatarModel: "models/avatar.json",
-      font: "fonts/helvetiker_regular.typeface.json",
-      progress: Preloader,
-      fullScreenButtonContainer: "#fullScreenButtonContainer"
-    });
+    var _this = this;
 
-    env.addEventListener("ready", function () {
-      form.showLoginForm();
-      Array.prototype.forEach.call(document.querySelectorAll("#fullScreenButtonContainer > button"), function (btn) {
-        btn.className = "primary";
-      });
-    });
+    return asyncToGenerator(regeneratorRuntime.mark(function _callee2() {
+      return regeneratorRuntime.wrap(function _callee2$(_context2) {
+        while (1) {
+          switch (_context2.prev = _context2.next) {
+            case 0:
+              env = new index$5.BrowserEnvironment({
+                useFog: false,
+                disableAutoPause: true,
+                groundModel: "models/meeting/meetingroom.obj",
+                avatarModel: "models/avatar.json",
+                font: "fonts/helvetiker_regular.typeface.json",
+                progress: Preloader,
+                fullScreenButtonContainer: "#fullScreenButtonContainer"
+              });
+
+              env.addEventListener("ready", asyncToGenerator(regeneratorRuntime.mark(function _callee() {
+                return regeneratorRuntime.wrap(function _callee$(_context) {
+                  while (1) {
+                    switch (_context.prev = _context.next) {
+                      case 0:
+                        form.showLoginForm();
+                        _context.next = 3;
+                        return MF.loadObject("models/monitor.obj", "obj", Preloader.thunk);
+
+                      case 3:
+                        monitor = _context.sent;
+
+                        monitor.addTo(env.scene).at(3.75, 1.2, 0).rot(0, Math.PI, 0);
+                        Array.prototype.forEach.call(document.querySelectorAll("#fullScreenButtonContainer > button"), function (btn) {
+                          return btn.className = "primary";
+                        });
+
+                      case 6:
+                      case "end":
+                        return _context.stop();
+                    }
+                  }
+                }, _callee, this);
+              })));
+
+            case 2:
+            case "end":
+              return _context2.stop();
+          }
+        }
+      }, _callee2, _this);
+    }))();
   },
   onconnectionerror: function onconnectionerror() {
     socket.close();
@@ -58878,44 +58942,106 @@ var form = loginForm({
     });
   },
   onauthenticated: function onauthenticated(roomName, userName) {
-    env.connect(socket, userName);
-    index$5.HTTP.getObject("/tokbox/" + encodeURI(roomName) + "/" + encodeURI(userName)).then(function (cred) {
-      session = OT.initSession(cred.apiKey, cred.sessionId);
-      session.on("streamCreated", function (evt) {
-        return promisify(function (handler) {
-          return session.subscribe(evt.stream, null, {
-            subscribeToAudio: true,
-            subscribeToVideo: false,
-            insertDefaultUI: false
-          }, handler);
-        }).then(function (subscriber) {
-          return subscriber.once("videoElementCreated", function (evt) {
-            return env.setAudioFromUser(subscriber.stream.connection.data, evt.element);
-          });
-        }).catch(function (err) {
-          return console.error("tokbox stream error", err);
-        });
-      });
+    var _this2 = this;
 
-      return promisify(function (handler) {
-        return session.connect(cred.token, handler);
-      });
-    }).then(function () {
-      return OT.initPublisher("tokbox", {
-        name: userName,
-        videoSource: false,
-        publishAudio: true,
-        publishVideo: false,
-        insertMode: "append",
-        showControls: false
-      });
-    }).then(function (publisher) {
-      return promisify(function (handler) {
-        return session.publish(publisher, handler);
-      });
-    }).catch(function (err) {
-      return console.error("tokbox connect error", err);
-    });
+    return asyncToGenerator(regeneratorRuntime.mark(function _callee4() {
+      var cred, publisher;
+      return regeneratorRuntime.wrap(function _callee4$(_context4) {
+        while (1) {
+          switch (_context4.prev = _context4.next) {
+            case 0:
+              _context4.prev = 0;
+
+              env.connect(socket, userName);
+              _context4.next = 4;
+              return index$5.HTTP.getObject("/tokbox/" + encodeURI(roomName) + "/" + encodeURI(userName));
+
+            case 4:
+              cred = _context4.sent;
+
+              session = OT.initSession(cred.apiKey, cred.sessionId);
+              session.on("streamCreated", function () {
+                var _ref2 = asyncToGenerator(regeneratorRuntime.mark(function _callee3(evt) {
+                  var subscriber;
+                  return regeneratorRuntime.wrap(function _callee3$(_context3) {
+                    while (1) {
+                      switch (_context3.prev = _context3.next) {
+                        case 0:
+                          _context3.prev = 0;
+                          _context3.next = 3;
+                          return promisify(function (handler) {
+                            return session.subscribe(evt.stream, null, {
+                              subscribeToAudio: true,
+                              subscribeToVideo: false,
+                              insertDefaultUI: false
+                            }, handler);
+                          });
+
+                        case 3:
+                          subscriber = _context3.sent;
+
+
+                          subscriber.once("videoElementCreated", function (evt) {
+                            return env.setAudioFromUser(subscriber.stream.connection.data, evt.element);
+                          });
+                          _context3.next = 10;
+                          break;
+
+                        case 7:
+                          _context3.prev = 7;
+                          _context3.t0 = _context3["catch"](0);
+
+                          console.error("tokbox stream error", _context3.t0);
+
+                        case 10:
+                        case "end":
+                          return _context3.stop();
+                      }
+                    }
+                  }, _callee3, this, [[0, 7]]);
+                }));
+
+                return function (_x) {
+                  return _ref2.apply(this, arguments);
+                };
+              }());
+
+              _context4.next = 9;
+              return promisify(function (handler) {
+                return session.connect(cred.token, handler);
+              });
+
+            case 9:
+              publisher = OT.initPublisher("tokbox", {
+                name: userName,
+                videoSource: false,
+                publishAudio: true,
+                publishVideo: false,
+                insertMode: "append",
+                showControls: false
+              });
+              _context4.next = 12;
+              return promisify(function (handler) {
+                return session.publish(publisher, handler);
+              });
+
+            case 12:
+              _context4.next = 17;
+              break;
+
+            case 14:
+              _context4.prev = 14;
+              _context4.t0 = _context4["catch"](0);
+
+              console.error("tokbox connect error", _context4.t0);
+
+            case 17:
+            case "end":
+              return _context4.stop();
+          }
+        }
+      }, _callee4, _this2, [[0, 14]]);
+    }))();
   }
 });
 
