@@ -1,9 +1,10 @@
 ﻿"use strict";
 
 const crypto = require("crypto"),
-  db = require("./db.js");
+  db = require("./db.js"),
+  tableName = "users";
 
-db.define("users", [
+db.define(tableName, [
   ["userName", "PartitionKey", "String"]
 ]);
 
@@ -17,19 +18,19 @@ function makeNewSalt() {
 }
 
 function getUser(userName) {
-  return db.get("users", userName, "");
+  return db.get(tableName, userName, "");
 }
 
 function searchUsers(key) {
-  return db.search("users", key);
+  return db.search(tableName, key);
 }
 
 function setUser(user) {
-  return db.set("users", user).then(() => user);
+  return db.set(tableName, user).then(() => user);
 }
 
 function deleteUser(obj) {
-  return db.delete("users", obj.userName, "");
+  return db.delete(tableName, obj.userName, "");
 }
 
 function deleteAll() {
