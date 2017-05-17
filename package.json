@@ -32,7 +32,6 @@
   "license": "GPL-3.0",
   "dependencies": {
     "azure-storage": "^2.1.0",
-    "jshashes": "^1.0.6",
     "marigold-build": "^1.7.6",
     "opentok": "^2.5.0",
     "primrose": "^0.31.7",
