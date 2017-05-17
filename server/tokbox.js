@@ -10,7 +10,7 @@ if(!API_KEY) {
 }
 else {
   const opentok = new OpenTok(API_KEY, SECRET),
-    sessions = {};
+    sessions = require("./data/sessions");
 
   function getSessionID() {
     return new Promise((resolve, reject) => {
@@ -31,17 +31,25 @@ else {
         let { room, user } = req.params;
         room = decodeURI(room).toLocaleUpperCase();
         user = decodeURI(user).toLocaleUpperCase();
-        if(!sessions[room]){
-          sessions[room] = getSessionID();
-        }
-        sessions[room].then((session) =>
-          res.json({
-            apiKey: API_KEY,
-            sessionId: session.sessionId,
-            token: session.generateToken({
-              data: user
-            })
-          }));
+        sessions
+          .get(room)
+          .then((oldSession) => oldSession || getSessionID()
+            .then((tokboxSession) => {
+              const newSession = {
+                roomName: room,
+                sessionID: tokboxSession.sessionId
+              };
+              return sessions.set(newSession)
+                .then(() => newSession);
+              }))
+          .then((session) =>
+            res.json({
+              apiKey: API_KEY,
+              sessionId: session.sessionId,
+              token: session.generateToken({
+                data: user
+              })
+            }));
       });
   };
 }
