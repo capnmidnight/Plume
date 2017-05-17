@@ -3,14 +3,16 @@ import loginForm from "./login-form";
 
 let socket = null,
   session = null,
-  env = null;
+  env = null,
+  monitor = null;
 
 const protocol = location.protocol.replace("http", "ws"),
   serverPath = protocol + "//" + location.host,
+  MF = Primrose.Graphics.ModelFactory,
 
   form = loginForm({
 
-    onnotios() {
+    async onnotios() {
       env = new Primrose.BrowserEnvironment({
         useFog: false,
         disableAutoPause: true,
@@ -21,11 +23,16 @@ const protocol = location.protocol.replace("http", "ws"),
         fullScreenButtonContainer: "#fullScreenButtonContainer"
       });
 
-      env.addEventListener("ready", function() {
+      env.addEventListener("ready", async function() {
         form.showLoginForm();
-        Array.prototype.forEach.call(document.querySelectorAll("#fullScreenButtonContainer > button"), function(btn) {
-          btn.className = "primary";
-        });
+        monitor = await MF.loadObject("models/monitor.obj", "obj", Preloader.thunk);
+        monitor.addTo(env.scene)
+          .at(3.75, 1.2, 0)
+          .rot(0, Math.PI, 0);
+        Array.prototype.forEach.call(
+          document.querySelectorAll("#fullScreenButtonContainer > button"),
+          (btn) =>
+            btn.className = "primary");
       });
     },
 
@@ -48,44 +55,44 @@ const protocol = location.protocol.replace("http", "ws"),
       });
     },
 
-    onauthenticated(roomName, userName) {
-      env.connect(socket, userName);
-      Primrose.HTTP
-        .getObject(`/tokbox/${encodeURI(roomName)}/${encodeURI(userName)}`)
-        .then((cred) => {
-          session = OT.initSession(cred.apiKey, cred.sessionId);
-          session.on("streamCreated", (evt) =>
-            promisify((handler) =>
+    async onauthenticated(roomName, userName) {
+      try {
+        env.connect(socket, userName);
+        const cred = await Primrose.HTTP.getObject(`/tokbox/${encodeURI(roomName)}/${encodeURI(userName)}`);
+        session = OT.initSession(cred.apiKey, cred.sessionId);
+        session.on("streamCreated", async function(evt){
+          try {
+            const subscriber = await promisify((handler) =>
               session.subscribe(evt.stream, null, {
-                subscribeToAudio: true,
-                subscribeToVideo: false,
-                insertDefaultUI: false
-              }, handler))
-              .then((subscriber) =>
-                subscriber.once("videoElementCreated", (evt) =>
-                  env.setAudioFromUser(
-                    subscriber.stream.connection.data,
-                    evt.element)))
-              .catch((err) =>
-                console.error("tokbox stream error", err)));
+                  subscribeToAudio: true,
+                  subscribeToVideo: false,
+                  insertDefaultUI: false
+                }, handler));
 
-          return promisify((handler) =>
-            session.connect(cred.token, handler));
-        })
-        .then(() =>
-          OT.initPublisher("tokbox", {
-            name: userName,
-            videoSource: false,
-            publishAudio: true,
-            publishVideo: false,
-            insertMode: "append",
-            showControls: false
-          }))
-        .then((publisher) =>
-          promisify((handler) =>
-            session.publish(publisher, handler)))
-        .catch((err) =>
-          console.error("tokbox connect error", err));
+            subscriber.once("videoElementCreated", (evt) =>
+                env.setAudioFromUser(
+                  subscriber.stream.connection.data,
+                  evt.element));
+          }
+          catch(err) {
+            console.error("tokbox stream error", err);
+          }
+        });
+
+        await promisify((handler) => session.connect(cred.token, handler));
+        const publisher = OT.initPublisher("tokbox", {
+          name: userName,
+          videoSource: false,
+          publishAudio: true,
+          publishVideo: false,
+          insertMode: "append",
+          showControls: false
+        });
+        await promisify((handler) => session.publish(publisher, handler));
+      }
+      catch(err) {
+        console.error("tokbox connect error", err);
+      }
     }
   });
 
