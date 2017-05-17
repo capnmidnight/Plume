@@ -11,11 +11,6 @@ const azure = require("azure-storage"),
   ent = azure.TableUtilities.entityGenerator,
   meta = {};
 
-console.log(secretsFile);
-if(!secretsFile) {
-  console.log("Couldn't read Secrets file.");
-}
-
 function wrap(table, obj) {
   var map = meta[table],
     trans = map.toEntity,
