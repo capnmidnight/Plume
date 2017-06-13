@@ -12,7 +12,7 @@ const protocol = location.protocol.replace("http", "ws"),
 
   form = loginForm({
 
-    async onnotios() {
+    async onwebrtcallowed() {
       env = new Primrose.BrowserEnvironment({
         useFog: false,
         disableAutoPause: true,

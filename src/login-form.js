@@ -116,11 +116,11 @@ export default function loginForm(options) {
   let defaultRoomName = null,
     defaultUserName = null;
 
-  if(isiOS) {
+  if(isiOS && !/\bOS 11_/.test(navigator.userAgent)) {
     ctrls.iOSMessage.style.display = "";
   }
   else {
-    options.onnotios();
+    options.onwebrtcallowed();
 
     ctrls.closeButton.addEventListener("click", hideLoginForm, false);
     ctrls.userName.addEventListener("keyup", authenticate, false);

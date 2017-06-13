@@ -1,12 +1,12 @@
 {
   "name": "plume",
   "private": true,
-  "version": "0.1.10",
+  "version": "0.1.11",
   "title": "Plume VR",
   "description": "Instant VR meetings in your browser.",
   "themeColor": "purple",
   "homepage": "https://www.plumevr.com",
-  "twitter": "@NotionTheory",
+  "twitter": "@Primrose_VR",
   "keywords": [
     "WebGL",
     "WebVR",
@@ -26,9 +26,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/NotionTheory/Plume.git"
+    "url": "https://github.com/capnmidnight/Plume.git"
   },
-  "author": "Sean T. McBeth <sean@notiontheory.com> (https://www.notiontheory.com)",
+  "author": "Sean T. McBeth <sean@seanmcbeth.com> (https://www.primrosevr.com)",
   "license": "GPL-3.0",
   "dependencies": {
     "azure-storage": "^2.1.0",

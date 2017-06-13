@@ -23,7 +23,7 @@
     instance: function(i) {
       return {
         query: {
-          room: "NotionTheory",
+          room: "Demo",
           user: testNames[i]
         }
       };
@@ -37,8 +37,9 @@
     express: require("./server/routes")
   });
 
-gulp.task("devServer", devServer);
+gulp.task("serve", devServer);
 
 marigold.taskify([js, html, css],{
-  default: devServer
+  default: devServer,
+  release: devServer
 });
