@@ -2,7 +2,7 @@
   pkg = require("./package.json"),
   marigold = require("marigold-build").setup(gulp, pkg),
   js = marigold.js({
-    dependencies: ["format"],
+    dependencies: ["prettify"],
     format: "umd",
     moduleName: "env"
   }),
