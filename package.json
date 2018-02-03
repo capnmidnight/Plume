@@ -31,10 +31,10 @@
   "author": "Sean T. McBeth <sean@seanmcbeth.com> (https://www.primrosevr.com)",
   "license": "GPL-3.0",
   "dependencies": {
-    "azure-storage": "^2.1.0",
+    "azure-storage": "^2.7.0",
     "marigold": "^1.0.0",
-    "opentok": "^2.5.0",
-    "primrose": "^0.31.7",
-    "socket.io-client": "^2.0.1"
+    "opentok": "^2.6.1",
+    "primrose": "^0.31.13",
+    "socket.io-client": "^2.0.4"
   }
 }
